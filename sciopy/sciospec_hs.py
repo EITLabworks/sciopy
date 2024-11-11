@@ -10,10 +10,10 @@ from sciopy import (
     split_bursts_in_frames,
 )
 
-from sciopy.sciopy_dataclasses import ScioSpecMeasurementSetup
+from sciopy.sciopy_dataclasses import EitMeasurementSetup
 
 
-def sciospec_measurement(COM_Sciospec, ssms: ScioSpecMeasurementSetup) -> None:
+def sciospec_measurement(COM_Sciospec, ssms: EitMeasurementSetup) -> None:
     measurement_data_hex = StartStopMeasurement_usb_hs(COM_Sciospec)
     measurement_data = del_hex_in_list(measurement_data_hex)
     split_measurement_data = reshape_full_message_in_bursts(measurement_data, ssms)

@@ -3,7 +3,7 @@ from typing import List, Tuple, Union
 
 
 @dataclass
-class ScioSpecMeasurementSetup:
+class EitMeasurementSetup:
     burst_count: int
     total_meas_num: int
     n_el: int
@@ -16,6 +16,11 @@ class ScioSpecMeasurementSetup:
     adc_range: int
     notes: str
     configured: bool
+
+
+@dataclass
+class EisMeasurementSetup:
+    pass
 
 
 @dataclass

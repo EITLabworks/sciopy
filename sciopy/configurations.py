@@ -1,7 +1,7 @@
 # TBD: https://stackoverflow.com/questions/3898572/what-are-the-most-common-python-docstring-formats
 from .sciopy_dataclasses import (
     ScioSpecMeasurementConfig,
-    ScioSpecMeasurementSetup,
+    EitMeasurementSetup,
 )
 from datetime import datetime
 import numpy as np
@@ -9,7 +9,7 @@ from typing import Union
 import struct
 
 
-def set_measurement_config(serial, ssms: ScioSpecMeasurementSetup) -> None:
+def set_measurement_config(serial, ssms: EitMeasurementSetup) -> None:
     """
     set_measurement_config sets the ScioSpec device configuration depending on the ssms configuration dataclass.
 
@@ -17,7 +17,7 @@ def set_measurement_config(serial, ssms: ScioSpecMeasurementSetup) -> None:
     ----------
     serial : _type_
         serial connection
-    ssms : ScioSpecMeasurementSetup
+    ssms : EitMeasurementSetup
         dataclass with the measurement setup settings.
     """
 
