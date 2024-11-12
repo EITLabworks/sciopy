@@ -2,13 +2,13 @@ import setuptools
 
 setuptools.setup(
     name="sciopy",
-    version="0.7.1.3",
+    version="1.0.0",
     author="Jacob Peter Thönes",
     author_email="jacob.thoenes@uni-rostock.de",
     description="Python based interface module for communication with the Sciospec Electrical Impedance Tomography (EIT) device.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    keywords="Sciospec EIT".split(),
+    keywords="Sciospec EIT EIS".split(),
     platforms="any",
     classifiers=[
         "Programming Language :: Python :: 3",

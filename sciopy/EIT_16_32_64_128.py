@@ -3,36 +3,49 @@ try:
 except ImportError:
     print("Could not import module: serial")
 
-import struct
-from dataclasses import dataclass
-from typing import List, Tuple, Union
+
+from com_util import (
+    clTbt_dp,
+    clTbt_sp,
+    del_hex_in_list,
+    reshape_full_message_in_bursts,
+    split_bursts_in_frames,
+)
 
 import numpy as np
 from pyftdi.ftdi import Ftdi
 
 
-@dataclass
-class EitMeasurementSetup:
-    burst_count: int
-    total_meas_num: int
-    n_el: int
-    channel_group: list
-    exc_freq: Union[int, float]
-    framerate: Union[int, float]
-    amplitude: Union[int, float]
-    inj_skip: Union[int, list]
-    gain: int
-    adc_range: int
-    notes: str
-    configured: bool
+msg_dict = {
+    "0x01": "No message inside the message buffer",
+    "0x02": "Timeout: Communication-timeout (less data than expected)",
+    "0x04": "Wake-Up Message: System boot ready",
+    "0x11": "TCP-Socket: Valid TCP client-socket connection",
+    "0x81": "Not-Acknowledge: Command has not been executed",
+    "0x82": "Not-Acknowledge: Command could not be recognized",
+    "0x83": "Command-Acknowledge: Command has been executed successfully",
+    "0x84": "System-Ready Message: System is operational and ready to receive data",
+    "0x92": "Data holdup: Measurement data could not be sent via the master interface",
+}
+
+from sciopy_dataclasses import EitMeasurementSetup
 
 
 class EIT_16_32_64_128:
-    def __init__(self, n_el) -> None:
-        # number of electrodes used
+    def __init__(self, n_el: int) -> None:
+        """
+        __init__
+
+        Parameters
+        ----------
+        n_el : int
+            number of electrodes used for measurement.
+        """
         self.n_el = n_el
+
         self.channel_group = self.init_channel_group()
         self.print_msg = True
+        self.ret_hex_int = None
 
     def init_channel_group(self):
         if self.n_el in [16, 32, 48, 64]:
@@ -84,23 +97,58 @@ class EIT_16_32_64_128:
 
         print("Connection to", self.device.name, "is established.")
 
-    # communication
-    def SystemMessageCallback_usb_hs(self):
+    def SystemMessageCallback_usb_fs(self):
         """
+        !Only used if a full-speed connection is established!
+
         Reads the message buffer of a serial connection. Also prints out the general system message.
         """
-        msg_dict = {
-            "0x01": "No message inside the message buffer",
-            "0x02": "Timeout: Communication-timeout (less data than expected)",
-            "0x04": "Wake-Up Message: System boot ready",
-            "0x11": "TCP-Socket: Valid TCP client-socket connection",
-            "0x81": "Not-Acknowledge: Command has not been executed",
-            "0x82": "Not-Acknowledge: Command could not be recognized",
-            "0x83": "Command-Acknowledge: Command has been executed successfully",
-            "0x84": "System-Ready Message: System is operational and ready to receive data",
-            "0x92": "Data holdup: Measurement data could not be sent via the master interface",
-        }
-        ret_hex_int = None
+        timeout_count = 0
+        received = []
+        received_hex = []
+        data_count = 0
+
+        while True:
+            buffer = self.device.read()
+            if buffer:
+                received.extend(buffer)
+                data_count += len(buffer)
+                timeout_count = 0
+                continue
+            timeout_count += 1
+            if timeout_count >= 1:
+                # Break if we haven't received any data
+                break
+
+            received = "".join(str(received))  # If you need all the data
+        received_hex = [hex(receive) for receive in received]
+        try:
+            msg_idx = received_hex.index("0x18")
+            if self.print_msg:
+                print(msg_dict[received_hex[msg_idx + 2]])
+        except BaseException:
+            if self.print_msg:
+                print(msg_dict["0x01"])
+            # self.print_msg = False
+        if self.print_msg:
+            print("message buffer:\n", received_hex)
+            print("message length:\t", data_count)
+
+        if self.ret_hex_int is None:
+            return
+        elif self.ret_hex_int == "hex":
+            return received_hex
+        elif self.ret_hex_int == "int":
+            return received
+        elif self.ret_hex_int == "both":
+            return received, received_hex
+
+    def SystemMessageCallback_usb_hs(self):
+        """
+        !Only used if a high-speed connection is established!
+
+        Reads the message buffer of a serial connection. Also prints out the general system message.
+        """
 
         timeout_count = 0
         received = []
@@ -128,25 +176,28 @@ class EIT_16_32_64_128:
         except BaseException:
             if self.print_msg:
                 print(msg_dict["0x01"])
-                # self.print_msg = False
+            # self.print_msg = False
         if self.print_msg:
             print("message buffer:\n", received_hex)
             print("message length:\t", data_count)
 
-        if ret_hex_int is None:
+        if self.ret_hex_int is None:
             return
-        elif ret_hex_int == "hex":
+        elif self.ret_hex_int == "hex":
             return received_hex
-        elif ret_hex_int == "int":
+        elif self.ret_hex_int == "int":
             return received
-        elif ret_hex_int == "both":
+        elif self.ret_hex_int == "both":
             return received, received_hex
 
     def SystemMessageCallback(self):
+        """
+        SystemMessageCallback
+        """
         if self.serial_protocol == "HS":
             self.SystemMessageCallback_usb_hs()
         elif self.serial_protocol == "FS":
-            pass  # TBD
+            self.SystemMessageCallback_usb_fs()
 
     def write_command_string(self, command):
         """
@@ -158,37 +209,48 @@ class EIT_16_32_64_128:
             self.device.write(command)
         self.SystemMessageCallback()
 
-    # ---
+    # --- sciospec device commands
 
     def SoftwareReset(self):
-        command = bytearray([0xA1, 0x00, 0xA1])
-        self.write_command_string(command)
+        self.print_msg = True
+        self.write_command_string(bytearray([0xA1, 0x00, 0xA1]))
+        self.print_msg = False
+
+    def update_BurstCount(self, burst_count):
+        self.print_msg = True
+        self.ssms.burst_count = burst_count
+        self.write_command_string(
+            bytearray([0xB0, 0x03, 0x02, 0x00, self.ssms.burst_count, 0xB0])
+        )
+        self.print_msg = False
+
+    def update_FrameRate(self, framerate):
+        self.print_msg = True
+        self.ssms.framerate = framerate
+        self.write_command_string(
+            bytearray(
+                list(
+                    np.concatenate([[176, 5, 3], clTbt_sp(self.ssms.framerate), [176]])
+                )
+            )
+        )
+        self.print_msg = False
 
     def SetMeasurementSetup(self, ssms: EitMeasurementSetup):
         """
-        set_measurement_config sets the ScioSpec device configuration depending on the ssms configuration dataclass.
+        set_measurement_config sets the ScioSpec device configuration depending on the EitMeasurementSetup configuration dataclass.
         """
 
-        def clTbt_sp(val: Union[int, float]) -> list:
-            """
-            clTbt_sp converts an integer or float value to a list of single precision bytes.
-            """
-            return [int(bt) for bt in struct.pack(">f", val)]
-
-        def clTbt_dp(val: float) -> list:
-            """
-            clTbt_dp converts an integer or float value to a list of double precision bytes.
-            """
-            return [int(ele) for ele in struct.pack(">d", val)]
-
+        self.ssms = ssms
         self.print_msg = False
-        # Set measurement setup:
-        self.write_command_string(bytearray([0xB0, 0x01, 0x01, 0xB0]))
-        # Set burst count: "B0 03 02 00 03 B0" = 3
+        self.ResetMeasurementSetup()
+
+        # set burst count | for 3: ["B0 03 02 00 03 B0"]
         self.write_command_string(
             bytearray([0xB0, 0x03, 0x02, 0x00, ssms.burst_count, 0xB0])
         )
-        # Excitation amplitude double precision
+
+        # set excitation alternating current amplitude double precision
         # A_min = 100nA
         # A_max = 10mA
         if ssms.amplitude > 0.01:
@@ -224,10 +286,13 @@ class EIT_16_32_64_128:
             self.write_command_string(bytearray([0xB0, 0x03, 0x09, 0x01, 0x02, 0xB0]))
         elif ssms.gain == 1_000:
             self.write_command_string(bytearray([0xB0, 0x03, 0x09, 0x01, 0x03, 0xB0]))
+
         # Single ended mode:
         self.write_command_string(bytearray([0xB0, 0x03, 0x08, 0x01, 0x01, 0xB0]))
+
         # Excitation switch type:
         self.write_command_string(bytearray([0xB0, 0x02, 0x0C, 0x01, 0xB0]))
+
         # Set framerate:
         self.write_command_string(
             bytearray(
@@ -239,7 +304,7 @@ class EIT_16_32_64_128:
         f_min = clTbt_sp(ssms.exc_freq)
         f_max = clTbt_sp(ssms.exc_freq)
         f_count = [0, 1]
-        f_type = [0]
+        f_type = [0]  # linear/log
         # bytearray
         self.write_command_string(
             bytearray(
@@ -252,67 +317,101 @@ class EIT_16_32_64_128:
         # Set injection config
         el_inj = np.arange(1, ssms.n_el + 1)
         el_gnd = np.roll(el_inj, -(ssms.inj_skip + 1))
-
         for v_el, g_el in zip(el_inj, el_gnd):
             self.write_command_string(bytearray([0xB0, 0x03, 0x06, v_el, g_el, 0xB0]))
+
         self.print_msg = True
-        # Get measurement setup
-        self.write_command_string(bytearray([0xB1, 0x01, 0x03, 0xB1]))
-        # Set output configuration
+        # Set output configuration - enable all
+        # |-- Excitation setting | [CT] 02 01 [enable/disable] [CT]
         self.write_command_string(bytearray([0xB2, 0x02, 0x01, 0x01, 0xB2]))
-        self.write_command_string(bytearray([0xB2, 0x02, 0x03, 0x01, 0xB2]))
+        # |-- Current row in the frequency stack | [CT] 02 02 [enable/disable] [CT]
         self.write_command_string(bytearray([0xB2, 0x02, 0x02, 0x01, 0xB2]))
+        # |-- Timestamp | [CT] 02 03 [enable/disable] [CT]
+        self.write_command_string(bytearray([0xB2, 0x02, 0x03, 0x01, 0xB2]))
+        self.print_msg = False
+
+    def SaveSettings(self):
+        print("TBD (to be checked)")
+        self.print_msg = True
+        self.write_command_string(bytearray([0x90, 0x00, 0x90]))
+        self.print_msg = False
 
     def ResetMeasurementSetup(self):
-        command = bytearray([0xB0, 0x01, 0x01, 0xB0])
-        self.write_command_string(command)
+        self.print_msg = True
+        self.write_command_string(bytearray([0xB0, 0x01, 0x01, 0xB0]))
+        self.print_msg = False
 
-    def GetMeasurementSetup(self):
-        command = bytearray([])
-        self.write_command_string(command)
+    def GetMeasurementSetup(self, setup_of: str):
+        """
+        GetMeasurementSetup
+
+        Burst Count                                    2 -> 0x02
+        Frame Rate                                     3 -> 0x03
+        Excitation Frequencies                         4 -> 0x04
+        Excitation Amplitude                           5 -> 0x05
+        Excitation Sequence                            6 -> 0x06
+        Single-Ended or Differential Measure Mode      7 -> 0x08
+        Gain Settings                                  8 -> 0x09
+        Excitation Switch Type                         9 -> 0x0C
+        """
+
+        print("TBD (to be checked)")
+        self.print_msg = True
+        self.write_command_string(bytearray([0xB1, 0x01, hex(setup_of), 0xB1]))
+
+        self.print_msg = False
 
     def StartStopMeasurement(self):
+        print("Start measurement.")
+        self.write_command_string(bytearray([0xB4, 0x01, 0x01, 0xB4]))
+        self.ret_hex_int = "hex"
+        data = self.SystemMessageCallback()
+        self.ret_hex_int = None
+        print("Stop measurement.")
+        self.write_command_string(bytearray([0xB4, 0x01, 0x00, 0xB4]))
 
-        print("Starting measurement.")
-        # start measurement
-        command = bytearray([0xB4, 0x01, 0x01, 0xB4])
-        self.write_command_string(command)
+        # data truncation and processing
+        data = del_hex_in_list(data)
+        data = reshape_full_message_in_bursts(data, self.ssms)
+        data = split_bursts_in_frames(data, self.ssms)
 
-        measurement_data_hex = SystemMessageCallback(
-            self.device, prnt_msg=False, ret_hex_int="hex"
-        )
-
-        # stop measurement
-        print("Stopping measurement.")
-        command = bytearray([0xB4, 0x01, 0x00, 0xB4])
-        self.write_command_string(command)
-
-        self.measurement_data_hex = measurement_data_hex
-        return measurement_data_hex
+        self.data = data
+        return data
 
     def SetOutputConfiguration(self):
-        command = bytearray([])
-        self.write_command_string(command)
+        print("TBD")
 
     def GetOutputConfiguration(self):
-        command = bytearray([])
-        self.write_command_string(command)
+        self.print_msg = True
+        # |-- Excitation setting | [CT] 02 01 [enable/disable] [CT]
+        print("Excitation setting: [enable/disable]")
+        self.write_command_string(bytearray([0xB3, 0x01, 0x01, 0xB2]))
+        # |-- Current row in the frequency stack | [CT] 02 02 [enable/disable] [CT]
+        print("Current row in the frequency stack: [enable/disable]")
+        self.write_command_string(bytearray([0xB3, 0x01, 0x02, 0xB2]))
+        # |-- Timestamp | [CT] 02 03 [enable/disable] [CT]
+        print("Timestamp: [enable/disable]")
+        self.write_command_string(bytearray([0xB3, 0x01, 0x03, 0xB2]))
+        self.print_msg = False
 
     def GetDeviceInfo(self):
-        command = bytearray([0xD1, 0x00, 0xD1])
-        self.write_command_string(command)
-        self.SystemMessageCallback()
+        self.print_msg = True
+        self.write_command_string(bytearray([0xD1, 0x00, 0xD1]))
+        self.print_msg = False
 
     def GetFirmwareIDs(self):
-        command = bytearray([0xD2, 0x00, 0xD2])
-        self.write_command_string(command)
-        self.SystemMessageCallback()
+        self.print_msg = True
+        self.write_command_string(bytearray([0xD2, 0x00, 0xD2]))
+        self.print_msg = False
 
+    def PowerPlugDetect(self):
+        self.print_msg = True
+        self.write_command_string(bytearray([0xCC, 0x01, 0x81, 0xCC]))
+        self.print_msg = False
 
-# 0xB5 - Get temperature
-# 0xC6 - Set Battery Control
-# 0xC7 - Get Battery Control
-# 0xC8 - Set LED Control
-# 0xC9 - Get LED Control
-# 0xCB - FrontIOs
-# 0xCC - Power Plug Detect
+        # 0xB5 - Get temperature
+        # 0xC6 - Set Battery Control
+        # 0xC7 - Get Battery Control
+        # 0xC8 - Set LED Control
+        # 0xC9 - Get LED Control
+        # 0xCB - FrontIOs

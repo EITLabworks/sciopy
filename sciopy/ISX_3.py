@@ -3,8 +3,12 @@ try:
 except ImportError:
     print("Could not import module: serial")
 
+from dataclasses import dataclass
 
-from sciopy_dataclasses import EisMeasurementSetup
+
+@dataclass
+class EisMeasurementSetup:
+    pass
 
 
 class ISX_3:
@@ -30,7 +34,6 @@ class ISX_3:
             stopbits=serial.STOPBITS_ONE,
             bytesize=serial.EIGHTBITS,
         )
-
         print("Connection to", self.device.name, "is established.")
 
     def SetOptions(self):
