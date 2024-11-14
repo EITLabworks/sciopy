@@ -5,7 +5,7 @@ dist/
 .eggs/
 sciopy.egg-info/
 .ipynb_checkpoints
-*.ipynb
+
 developing.ipynb
 update_package.sh
 update_test_pypi.sh
