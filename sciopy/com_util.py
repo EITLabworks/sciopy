@@ -4,7 +4,8 @@ try:
     import serial
 except ImportError:
     print("Could not import module: serial")
-from sciopy_dataclasses import EitMeasurementSetup, SingleFrame
+
+from .sciopy_dataclasses import EitMeasurementSetup, SingleFrame
 
 import numpy as np
 import struct
@@ -242,18 +243,10 @@ def parse_single_frame(lst_ele: np.ndarray) -> SingleFrame:
 
 
 def split_bursts_in_frames(
-    split_list: np.ndarray, ssms: EitMeasurementSetup
+    split_list: np.ndarray, burst_count: int, channel_group: list
 ) -> np.ndarray:
     """
     Takes the splitted list from `reshape_full_message_in_bursts()` and parses the single frames.
-
-
-    Parameters
-    ----------
-    split_list : np.ndarray
-        splitted input list
-    ssms : EitMeasurementSetup
-        dataclass object configuration file
 
     Returns
     -------
@@ -264,12 +257,12 @@ def split_bursts_in_frames(
     frame = []  # Channel group depending frame
     burst_frame = []  # single burst count frame with channel depending frame
     subframe_length = split_list.shape[1] // msg_len
-    for bursts in range(ssms.burst_count):  # Iterate over bursts
+    for bursts in range(burst_count):  # Iterate over bursts
         tmp_split_list = np.reshape(split_list[bursts], (subframe_length, msg_len))
         for subframe in range(subframe_length):
             parsed_sgl_frame = parse_single_frame(tmp_split_list[subframe])
             # Select the right channel group data
-            if parsed_sgl_frame.channel_group in ssms.channel_group:
+            if parsed_sgl_frame.channel_group in channel_group:
                 frame.append(parsed_sgl_frame)
         burst_frame.append(frame)
         frame = []  # Reset channel depending single burst frame

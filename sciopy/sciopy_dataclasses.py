@@ -5,17 +5,14 @@ from typing import List, Tuple, Union
 @dataclass
 class EitMeasurementSetup:
     burst_count: int
-    total_meas_num: int
     n_el: int
-    channel_group: list
     exc_freq: Union[int, float]
     framerate: Union[int, float]
     amplitude: Union[int, float]
     inj_skip: Union[int, list]
     gain: int
     adc_range: int
-    notes: str
-    configured: bool
+    # TBD: lin/log/sweep
 
 
 @dataclass
