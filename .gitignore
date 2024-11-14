@@ -1,6 +1,7 @@
 __pycache__/
 build/
 dist/
+.update_package.sh.swp
 .eggs/
 sciopy.egg-info/
 .ipynb_checkpoints
