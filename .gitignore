@@ -1,4 +1,5 @@
 __pycache__/
+manuals
 build/
 dist/
 .update_package.sh.swp
