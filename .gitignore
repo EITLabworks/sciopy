@@ -1,5 +1,6 @@
 __pycache__/
 manuals
+error_device_logs
 build/
 dist/
 .update_package.sh.swp
