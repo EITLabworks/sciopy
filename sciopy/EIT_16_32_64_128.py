@@ -393,7 +393,7 @@ class EIT_16_32_64_128:
         self.data = data
 
         if return_as == "hex":
-            return data
+            return self.data
         elif return_as == "pot_mat":
             return self.get_data_as_matrix()
 
