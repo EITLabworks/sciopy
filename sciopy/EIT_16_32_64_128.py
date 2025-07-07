@@ -97,6 +97,12 @@ class EIT_16_32_64_128:
 
         print("Connection to", self.device.name, "is established.")
 
+    def disconnect_device(self):
+        """
+        Disconnect serial device
+        """
+        self.device.close()
+
     def SystemMessageCallback_usb_fs(self):
         """
         !Only used if a full-speed connection is established!
