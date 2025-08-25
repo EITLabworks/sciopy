@@ -1,8 +1,9 @@
-import setuptools
+from setuptools import setup, find_packages
 
-setuptools.setup(
+setup(
     name="sciopy",
-    version="0.8.0",
+    version="0.8.2",
+    packages=find_packages(),
     author="Jacob Peter Thönes",
     author_email="jacob.thoenes@uni-rostock.de",
     description="Python based interface module for communication with the Sciospec Electrical Impedance Tomography (EIT) device.",
