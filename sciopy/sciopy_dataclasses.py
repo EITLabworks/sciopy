@@ -4,6 +4,20 @@ from typing import List, Tuple, Union
 
 @dataclass
 class EitMeasurementSetup:
+    """
+    Represents the setup parameters for Electrical Impedance Tomography (EIT) measurements.
+
+    Attributes:
+        burst_count (int): Number of bursts per measurement cycle.
+        n_el (int): Number of electrodes used in the measurement.
+        exc_freq (int or float): Excitation frequency in Hz.
+        framerate (int or float): Frame rate of the measurement in Hz.
+        amplitude (int or float): Amplitude of the excitation signal.
+        inj_skip (int or list): Electrode(s) to skip during current injection.
+        gain (int): Amplifier gain setting.
+        adc_range (int): Analog-to-digital converter range setting.
+    """
+
     burst_count: int
     n_el: int
     exc_freq: Union[int, float]
@@ -17,7 +31,34 @@ class EitMeasurementSetup:
 
 @dataclass
 class EisMeasurementSetup:
-    pass
+    """
+    Represents the setup parameters for an Electrochemical Impedance Spectroscopy (EIS) measurement.
+
+    Attributes:
+        start (int | float): Start frequency in Hz (e.g., 500000 for 500kHz).
+        stop (int | float): Stop frequency in Hz.
+        step (int | float): Number of frequency steps.
+        stepmode (str): Type of frequency distribution over the interval ('lin' for linear, 'log' for logarithmic).
+        AVG (int | float): Number of averages taken per measurement.
+        Amplitude (int | float): Amplitude of the excitation signal in mV.
+        Precision (int): Desired precision configuration (≥0):
+            - 1: Standard configuration (max relative deviation < 0.1%)
+            - <1: Faster measurement, less precise
+            - >1: More precise, slower measurement
+        MeasurementTime (int | float): Duration of the measurement in seconds.
+
+    Note:
+        Additional parameters may include measurement channel settings and other hardware-specific configurations.
+    """
+
+    start: Union[int, float]
+    stop: Union[int, float]
+    step: Union[int, float]
+    stepmode: str  # 'lin', 'log'
+    AVG: Union[int, float]
+    Amplitude: Union[int, float]
+    Precision: int
+    MeasurementTime: Union[int, float]
 
 
 @dataclass
