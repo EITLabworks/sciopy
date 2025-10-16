@@ -1,4 +1,4 @@
-""" Convert a .eit file to python sctructured data"""
+"""Convert a .eit file to python sctructured data"""
 
 import os
 import numpy as np

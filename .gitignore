@@ -1,8 +1,5 @@
-__pycache__/
 manuals
 error_device_logs
-build/
-dist/
 .update_package.sh.swp
 .eggs/
 sciopy.egg-info/
@@ -22,3 +19,40 @@ examples/measuremet_16/*
 examples/measuremet_32/*
 sciopy/eth_*
 Driver
+ISX3-dev.ipynb
+update_docu.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# virtualenvs
+.env/
+.venv/
+.docs-venv/
+docs-venv/
+venv/
+venv*/
+
+# Sphinx build outputs & doctrees
+docs/_build/
+docs/_doctrees/
+_build/
+.doctrees/
+
+# Sphinx cache / temp
+docs/.doctrees/
+*.doctree
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# pip / wheel cache (optional)
+pip-wheel-metadata/
+*.whl

@@ -1,3 +1,5 @@
+"""Serial data handling"""
+
 from typing import Union
 
 try:

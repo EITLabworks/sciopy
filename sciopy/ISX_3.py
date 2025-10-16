@@ -1,3 +1,5 @@
+"""Module for interfacing with the Sciospec ISX-3 EIT device via serial communication"""
+
 try:
     import serial
 except ImportError:
@@ -5,36 +7,153 @@ except ImportError:
 
 from dataclasses import dataclass
 
+from .sciopy_dataclasses import EisMeasurementSetup
 
-@dataclass
-class EisMeasurementSetup:
-    pass
+
+msg_dict = {
+    "0x01": "No message inside the message buffer",
+    "0x02": "Timeout: Communication-timeout (less data than expected)",
+    "0x04": "Wake-Up Message: System boot ready",
+    "0x11": "TCP-Socket: Valid TCP client-socket connection",
+    "0x81": "Not-Acknowledge: Command has not been executed",
+    "0x82": "Not-Acknowledge: Command could not be recognized",
+    "0x83": "Command-Acknowledge: Command has been executed successfully",
+    "0x84": "System-Ready Message: System is operational and ready to receive data",
+    "0x92": "Data holdup: Measurement data could not be sent via the master interface",
+}
+
+error_msg_dict = {
+    "0x01": "init setup failed",
+    "0x02": "add frequency block failed",
+    "0x03": "set parasitic parameters failed",
+    "0x04": "set acceleration settings failed",
+    "0x05": "set sync time failed",
+    "0x06": "set channel settings failed",
+    "0x07": "set calibration data failed",
+    "0x08": "set timestamp failed",
+    "0x09": "start measurement failed",
+    "0x22": "set amplitude failed",
+}
+
+
+acknowledge_msg_dict = {
+    "0x01": "Frame-Not-Acknowledge: Incorrect syntax",
+    "0x02": "Timeout: Communication-timeout (less data than expected)",
+    "0x04": "Wake-Up Message: System boot ready",
+    "0x81": "Not-Acknowledge: Command has not been executed",
+    "0x82": "Not-Acknowledge: Command could not be recognized",
+    "0x83": "Command-Acknowledge: Command has been executed successfully",
+    "0x84": "System-Ready Message: System is operational and ready to receive data",
+}
 
 
 class ISX_3:
-    def __init__(self, n_el) -> None:
-        # number of electrodes used
-        self.n_el = n_el
+    """
+    A class for interfacing with the Sciospec ISX-3 EIT device.
+    """
 
-    def connect_device_FS(self, port: str, baudrate: int = 9600, timeout: int = 1):
+    def __init__(self) -> None:
+        self.print_msg = True
+        self.ret_hex_int = None
+
+    def connect_device_USB2(self, port: str, baudrate: int = 9600, timeout: int = 1):
         """
-        Connect to full speed
+        Connect to USB 2.0 Type B
         """
-        if hasattr(self, "serial_protocol"):
+        if hasattr(self, "USB-FS"):
             print(
-                "Serial connection 'self.serial_protocol' already defined as {self.serial_protocol}."
+                f"Serial connection 'self.serial_protocol' already defined as {self.serial_protocol}."
             )
         else:
-            self.serial_protocol = "FS"
-        self.device = serial.Serial(
-            port=port,
-            baudrate=baudrate,
-            timeout=timeout,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            bytesize=serial.EIGHTBITS,
-        )
-        print("Connection to", self.device.name, "is established.")
+            self.serial_protocol = "USB-FS"
+            self.device = serial.Serial(
+                port=port,
+                baudrate=baudrate,
+                timeout=timeout,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                bytesize=serial.EIGHTBITS,
+            )
+            print("Connection to", self.device.name, "is established.")
+
+    def disconnect_device_USB2(self):
+        self.device.close()
+        print("Connection to", self.device.name, "is closed.")
+
+    def SystemMessageCallback(self):
+        """
+        Reads the message buffer of a serial connection. Also prints out the general system message.
+        """
+        timeout_count = 0
+        received = []
+        received_hex = []
+        data_count = 0
+
+        while True:
+            buffer = self.device.read()
+            if buffer:
+                received.extend(buffer)
+                data_count += len(buffer)
+                timeout_count = 0
+                continue
+            timeout_count += 1
+            if timeout_count >= 1:
+                # Break if we haven't received any data
+                break
+
+            received = "".join(str(received))  # If you need all the data
+        received_hex = [hex(receive) for receive in received]
+        try:
+            msg_idx = received_hex.index("0x18")
+            if self.print_msg:
+                print(msg_dict[received_hex[msg_idx + 2]])
+        except BaseException:
+            if self.print_msg:
+                print(msg_dict["0x01"])
+            # self.print_msg = False
+        if self.print_msg:
+            print("message buffer:\n", received_hex)
+            print("message length:\t", data_count)
+
+        if self.ret_hex_int is None:
+            return
+        elif self.ret_hex_int == "hex":
+            return received_hex
+        elif self.ret_hex_int == "int":
+            return received
+        elif self.ret_hex_int == "both":
+            return received, received_hex
+
+    def write_command_string(self, command):
+        """
+        Function for writing a command 'bytearray(...)' to the serial port
+        """
+        self.device.write(command)
+        self.SystemMessageCallback()
+
+    def ResetSystem(self):
+        self.print_msg = True
+        self.write_command_string(bytearray([0xA1, 0x00, 0xA1]))
+        self.print_msg = False
+
+    def SetMeasurementSetup(self, setup: EisMeasurementSetup):
+        """
+        Configures the measurement setup for the device.
+
+        Parameters
+        ----------
+        setup : EisMeasurementSetup
+            An instance of EisMeasurementSetup containing the measurement parameters.
+        """
+
+        self.print_msg = True
+        # self.write_command_string(command)
+        self.print_msg = False
+
+    def StartMeasure(self):
+        self.print_msg = True
+        self.write_command_string(bytearray([0xB8, 0x01, 0x01, 0x01, 0xB8]))
+        self.print_msg = False
 
     def SetOptions(self):
         # 0x97
@@ -44,17 +163,62 @@ class ISX_3:
         # 0x98
         pass
 
-    def ResetSystem(self):
-        # 0xA1
-        pass
+    def SetFE_Settings(self, PP, CH, RA):
+        """
+        Configures the frontend measurement settings for the device.
 
-    def SetFE_Settings(self):
-        # 0xB0
-        pass
+        PP : int
+            Measurement mode (see above for options).
+        CH : int
+            Measurement channel (see above for options).
+        RA : int
+            Range setting (see above for options).
+
+        Frontend configuration:
+        - PP (Measurement mode):
+            - 0x02: 4 point configuration
+        - CH (Measurement channel):
+            - 0x01: BNC Port (ISX-3mini: Port 1)
+            - 0x02: ExtensionPort
+            - 0x03: ExtensionPort2 (ISX-3mini: Port 2, ISX-3v2: optional, InternalMux)
+        - RA (Range Settings):
+            - 0x01: 100 Ohm
+            - 0x02: 10 kOhm
+            - 0x04: 1 MOhm
+        """
+        self.print_msg = True
+        self.write_command_string(bytearray([0xB0, PP, CH, RA, 0xB0]))
+        self.print_msg = False
 
     def GetFE_Settings(self):
-        # 0xB1
-        pass
+        """
+        Retrieves the frontend measurement settings from the device.
+
+        Returns:
+            dict: Dictionary containing PP (Measurement mode), CH (Measurement channel), RA (Range setting).
+        """
+        self.print_msg = True
+        # TBD: write_command_string needs to return response
+        self.write_command_string(bytearray([0xB1, 0x00, 0xB1]))
+        response = self.read_response()
+        self.print_msg = False
+
+        if (
+            response
+            and len(response) >= 6
+            and response[0] == 0xB1
+            and response[-1] == 0xB1
+        ):
+            self.PP = response[2]
+            self.CH = response[3]
+            self.RA = response[4]
+            print("Frontend Settings:")
+            print(f"Measurement Mode (PP): {self.PP}")
+            print(f"Measurement Channel (CH): {self.CH}")
+            print(f"Range Setting (RA): {self.RA}")
+        else:
+            print("Failed to get FE settings or invalid response.")
+            return None
 
     def SetExtensionPortChannel(self):
         # 0xB2
@@ -74,10 +238,6 @@ class ISX_3:
 
     def SetSetup(self):
         # 0xB7
-        pass
-
-    def StartMeasure(self):
-        # 0xB8
         pass
 
     def SetSyncTime(self):
@@ -100,8 +260,32 @@ class ISX_3:
         # 0xD3
         pass
 
+    def Action(self):
+        self.print_msg = True
+        self.write_command_string(bytearray([0xD2, 0x00, 0xD2]))
+        self.print_msg = False
 
-# 0xBD - Set Ethernet Configuration
-# 0xBE - Get Ethernet Configuration
-# 0xCF - TCP connection watchdog
-# 0xD0 - Get ARM firmware ID
+
+# - 0x90 - Save Settings
+# - 0x97 - Set Options
+# - 0x98 - Get Options
+# - 0x99 - Set IOPort Configuration
+# - 0x9A - Get IOPort Configuration
+# - 0x9B - Set NTC Parameter 1
+# - 0x9D - Set NTC Parameter 2
+# - 0x9C - Get NTC Parameter 1
+# - 0x9E - Get NTC Parameter 2
+# - 0xA1 - Reset System
+# - 0xB0 - Set FE Settings
+# - 0xB1 - Get FE Settings
+# - 0xB2 - Set ExtensionPort Channel
+# - 0xB3 - Get ExtPort Channel
+# - 0xB5 - Get ExtPort Module
+# - 0xB6 - Set Setup
+# - 0xB7 - Get Setup
+# - 0xB8 - Start Measure
+# - 0xB9 - Set Sync Time
+# - 0xBA - Get Sync Time
+# - 0xBD - Set Ethernet Configuration
+# - 0xBE - Get Ethernet Configur
+# - 0xD0 - Get ARM firmware ID
