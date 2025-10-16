@@ -51,14 +51,14 @@ class EisMeasurementSetup:
         Additional parameters may include measurement channel settings and other hardware-specific configurations.
     """
 
-    start: Union[int, float]
-    stop: Union[int, float]
+    start: Union[int, float]  # min 100mHz
+    stop: Union[int, float]  # max 10MHz
     step: Union[int, float]
     stepmode: str  # 'lin', 'log'
-    AVG: Union[int, float]
-    Amplitude: Union[int, float]
-    Precision: int
-    MeasurementTime: Union[int, float]
+    avg: Union[int, float]
+    amplitude: Union[int, float]
+    precision: int
+    measurement_time: Union[int, float]
 
 
 @dataclass

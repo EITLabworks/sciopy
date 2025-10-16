@@ -5,7 +5,20 @@ except ImportError:
 
 from dataclasses import dataclass
 
-from sciopy.sciopy_dataclasses import EisMeasurementSetup
+from .sciopy_dataclasses import EisMeasurementSetup
+
+
+msg_dict = {
+    "0x01": "No message inside the message buffer",
+    "0x02": "Timeout: Communication-timeout (less data than expected)",
+    "0x04": "Wake-Up Message: System boot ready",
+    "0x11": "TCP-Socket: Valid TCP client-socket connection",
+    "0x81": "Not-Acknowledge: Command has not been executed",
+    "0x82": "Not-Acknowledge: Command could not be recognized",
+    "0x83": "Command-Acknowledge: Command has been executed successfully",
+    "0x84": "System-Ready Message: System is operational and ready to receive data",
+    "0x92": "Data holdup: Measurement data could not be sent via the master interface",
+}
 
 error_msg_dict = {
     "0x01": "init setup failed",
@@ -20,7 +33,8 @@ error_msg_dict = {
     "0x22": "set amplitude failed",
 }
 
-frame_status_dict = {
+
+acknowledge_msg_dict = {
     "0x01": "Frame-Not-Acknowledge: Incorrect syntax",
     "0x02": "Timeout: Communication-timeout (less data than expected)",
     "0x04": "Wake-Up Message: System boot ready",
@@ -32,29 +46,108 @@ frame_status_dict = {
 
 
 class ISX_3:
-    def __init__(self, n_el) -> None:
-        # number of electrodes used
-        self.n_el = n_el
+    def __init__(self) -> None:
+        self.print_msg = True
+        self.ret_hex_int = None
 
     def connect_device_USB2(self, port: str, baudrate: int = 9600, timeout: int = 1):
         """
         Connect to USB 2.0 Type B
         """
-        if hasattr(self, "serial_protocol"):
+        if hasattr(self, "USB-FS"):
             print(
-                "Serial connection 'self.serial_protocol' already defined as {self.serial_protocol}."
+                f"Serial connection 'self.serial_protocol' already defined as {self.serial_protocol}."
             )
         else:
-            self.serial_protocol = "FS"
-        self.device = serial.Serial(
-            port=port,
-            baudrate=baudrate,
-            timeout=timeout,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            bytesize=serial.EIGHTBITS,
-        )
-        print("Connection to", self.device.name, "is established.")
+            self.serial_protocol = "USB-FS"
+            self.device = serial.Serial(
+                port=port,
+                baudrate=baudrate,
+                timeout=timeout,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                bytesize=serial.EIGHTBITS,
+            )
+            print("Connection to", self.device.name, "is established.")
+
+    def disconnect_device_USB2(self):
+        self.device.close()
+        print("Connection to", self.device.name, "is closed.")
+
+    def SystemMessageCallback(self):
+        """
+        Reads the message buffer of a serial connection. Also prints out the general system message.
+        """
+        timeout_count = 0
+        received = []
+        received_hex = []
+        data_count = 0
+
+        while True:
+            buffer = self.device.read()
+            if buffer:
+                received.extend(buffer)
+                data_count += len(buffer)
+                timeout_count = 0
+                continue
+            timeout_count += 1
+            if timeout_count >= 1:
+                # Break if we haven't received any data
+                break
+
+            received = "".join(str(received))  # If you need all the data
+        received_hex = [hex(receive) for receive in received]
+        try:
+            msg_idx = received_hex.index("0x18")
+            if self.print_msg:
+                print(msg_dict[received_hex[msg_idx + 2]])
+        except BaseException:
+            if self.print_msg:
+                print(msg_dict["0x01"])
+            # self.print_msg = False
+        if self.print_msg:
+            print("message buffer:\n", received_hex)
+            print("message length:\t", data_count)
+
+        if self.ret_hex_int is None:
+            return
+        elif self.ret_hex_int == "hex":
+            return received_hex
+        elif self.ret_hex_int == "int":
+            return received
+        elif self.ret_hex_int == "both":
+            return received, received_hex
+
+    def write_command_string(self, command):
+        """
+        Function for writing a command 'bytearray(...)' to the serial port
+        """
+        self.device.write(command)
+        self.SystemMessageCallback()
+
+    def ResetSystem(self):
+        self.print_msg = True
+        self.write_command_string(bytearray([0xA1, 0x00, 0xA1]))
+        self.print_msg = False
+
+    def SetMeasurementSetup(self, setup: EisMeasurementSetup):
+        """
+        Configures the measurement setup for the device.
+
+        Parameters
+        ----------
+        setup : EisMeasurementSetup
+            An instance of EisMeasurementSetup containing the measurement parameters.
+        """
+
+        self.print_msg = True
+        # self.write_command_string(command)
+        self.print_msg = False
+
+    def StartMeasure(self):
+        self.print_msg = True
+        self.write_command_string(bytearray([0xB8, 0x01, 0x01, 0x01, 0xB8]))
+        self.print_msg = False
 
     def SetOptions(self):
         # 0x97
@@ -63,11 +156,6 @@ class ISX_3:
     def GetOptions(self):
         # 0x98
         pass
-
-    def ResetSystem(self):
-        self.print_msg = True
-        self.write_command_string(bytearray([0xA1, 0x00, 0xA1]))
-        self.print_msg = False
 
     def SetFE_Settings(self, PP, CH, RA):
         """
@@ -144,10 +232,6 @@ class ISX_3:
 
     def SetSetup(self):
         # 0xB7
-        pass
-
-    def StartMeasure(self):
-        # 0xB8
         pass
 
     def SetSyncTime(self):
