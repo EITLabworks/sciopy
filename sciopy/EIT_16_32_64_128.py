@@ -1,3 +1,5 @@
+"""Module for interfacing with the Sciospec EIT devices via serial communication"""
+
 try:
     import serial
 except ImportError:
@@ -32,6 +34,10 @@ from .sciopy_dataclasses import EitMeasurementSetup
 
 
 class EIT_16_32_64_128:
+    """
+    A class for interfacing with the Sciospec EIT 16/32/64/128 devices.
+    """
+
     def __init__(self, n_el: int) -> None:
         """
         __init__

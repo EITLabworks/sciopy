@@ -1,3 +1,5 @@
+"""A Python package for Sciospec device communication"""
+
 from .com_util import (
     available_serial_ports,
 )

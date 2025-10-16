@@ -1,3 +1,5 @@
+"""*WIP* module for mesh generation and plotting"""
+
 from typing import Union
 import matplotlib.pyplot as plt
 import numpy as np

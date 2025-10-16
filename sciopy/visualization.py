@@ -1,10 +1,24 @@
+"""Visualize recorded samples"""
+
 import matplotlib.pyplot as plt
 import numpy as np
-import math
-import os
-from typing import Tuple
-from .prepare_data import comp_tank_relative_r_phi
-from sciopy.prepare_data import norm_data
+
+
+def norm_data(data: np.ndarray) -> np.ndarray:
+    """
+    Normalize data between 0 and 1.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        data to normalize
+
+    Returns
+    -------
+    np.ndarray
+        normalized data
+    """
+    return (data - np.min(data)) / (np.max(data) - np.min(data))
 
 
 def plot_potential_matrix(sample: np.lib.npyio.NpzFile) -> None:

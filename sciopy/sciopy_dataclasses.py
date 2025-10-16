@@ -1,3 +1,5 @@
+"""Dataclasses for sciopy package."""
+
 from dataclasses import dataclass
 from typing import List, Tuple, Union
 

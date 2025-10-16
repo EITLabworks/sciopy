@@ -1,3 +1,5 @@
+"""Module for interfacing with the Sciospec ISX-3 EIT device via serial communication"""
+
 try:
     import serial
 except ImportError:
@@ -46,6 +48,10 @@ acknowledge_msg_dict = {
 
 
 class ISX_3:
+    """
+    A class for interfacing with the Sciospec ISX-3 EIT device.
+    """
+
     def __init__(self) -> None:
         self.print_msg = True
         self.ret_hex_int = None
