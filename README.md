@@ -2,9 +2,10 @@
 
 This package offers the serial interface for communication with an EIT device from ScioSpec. Commands can be written serially and the system response can be read out. With the current version, it is possible to start and stop measurements with defined burst counts and to read out the measurement data. In addition, the measurement data is packed into a data class for better further processing.
 
+**WIP** Communication with ISX-3
 
 ## Contact
 
-If you have ideas or other advice don't hesitate to contact me!
+If you have any ideas or other suggestions, please don't hesitate to contact me.
 
 Email: jacob.thoenes@uni-rostock.de
