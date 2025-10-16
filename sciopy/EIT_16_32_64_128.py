@@ -48,7 +48,19 @@ class EIT_16_32_64_128:
         self.ret_hex_int = None
 
     def init_channel_group(self):
-        if self.n_el in [16, 32, 48, 64]:
+        """
+        Initializes and returns a list representing the channel group based on the number of electrodes.
+        Returns:
+            list: A list of channel group indices, where each index corresponds to a channel.
+                  The number of channels is determined by dividing `self.n_el` by 16.
+        Raises:
+            ValueError: If `self.n_el` is not one of the allowed values (16, 32, 48, 64, or 128).
+        Notes:
+            - Allowed values for `self.n_el` are 16, 32, 48, 64, and 128.
+            - The returned list contains consecutive integers starting from 1 up to `self.n_el // 16`.
+        """
+
+        if self.n_el in [16, 32, 48, 64, 128]:
             return [ch + 1 for ch in range(self.n_el // 16)]
         else:
             raise ValueError(
@@ -57,7 +69,22 @@ class EIT_16_32_64_128:
 
     def connect_device_HS(self, url: str = "ftdi://ftdi:232h/1", baudrate: int = 9000):
         """
-        Connect to high speed
+        Establishes a high-speed serial connection to an FTDI device.
+
+        This method initializes the FTDI device using the specified URL and baudrate,
+        configures the device for synchronous FIFO mode, and sets up the serial protocol.
+        If a serial connection is already defined, it notifies the user.
+
+        Args:
+            url (str): The FTDI device URL. Defaults to "ftdi://ftdi:232h/1".
+            baudrate (int): The baud rate for the serial connection. Defaults to 9000.
+
+        Side Effects:
+            Sets the `self.serial_protocol` attribute to "HS" if not already defined.
+            Initializes and configures the FTDI device, assigning it to `self.device`.
+
+        Raises:
+            Any exceptions raised by the FTDI library during device initialization or configuration.
         """
         if hasattr(self, "serial_protocol"):
             print(
@@ -78,7 +105,18 @@ class EIT_16_32_64_128:
 
     def connect_device_FS(self, port: str, baudrate: int = 9600, timeout: int = 1):
         """
-        Connect to full speed
+        Establishes a serial connection to a device using the FS protocol.
+
+        Parameters:
+            port (str): The serial port to connect to (e.g., 'COM3' or '/dev/ttyUSB0').
+            baudrate (int, optional): The baud rate for the serial connection. Defaults to 9600.
+            timeout (int, optional): The timeout value for the serial connection in seconds. Defaults to 1.
+
+        Notes:
+            - If a serial connection is already defined in 'self.serial_protocol', a message is printed.
+            - Sets 'self.serial_protocol' to "FS" if not already defined.
+            - Initializes 'self.device' as a serial.Serial object with specified parameters.
+            - Prints a confirmation message upon successful connection.
         """
         if hasattr(self, "serial_protocol"):
             print(
@@ -99,15 +137,27 @@ class EIT_16_32_64_128:
 
     def disconnect_device(self):
         """
-        Disconnect serial device
+        Disconnects the currently connected device by closing its connection.
+
+        This method should be called to safely terminate communication with the device.
         """
         self.device.close()
 
     def SystemMessageCallback_usb_fs(self):
         """
-        !Only used if a full-speed connection is established!
+        Reads data from a USB device, processes received messages, and returns the data in the specified format.
 
-        Reads the message buffer of a serial connection. Also prints out the general system message.
+        The method continuously reads from the device until no more data is received, then processes the received bytes.
+        It converts the received data to hexadecimal format and attempts to identify a specific message index.
+        Depending on the value of `self.ret_hex_int`, it returns the data as hexadecimal, integer, or both.
+
+        Prints diagnostic messages if `self.print_msg` is True.
+
+        Returns:
+            list[str]: List of received data in hexadecimal format if `self.ret_hex_int == "hex"`.
+            list[int]: List of received data as integers if `self.ret_hex_int == "int"`.
+            tuple: Both integer and hexadecimal lists if `self.ret_hex_int == "both"`.
+            None: If `self.ret_hex_int` is None.
         """
         timeout_count = 0
         received = []
@@ -151,11 +201,21 @@ class EIT_16_32_64_128:
 
     def SystemMessageCallback_usb_hs(self):
         """
-        !Only used if a high-speed connection is established!
+        Reads data from a USB high-speed device, processes received messages, and returns the data in various formats.
 
-        Reads the message buffer of a serial connection. Also prints out the general system message.
+        The method continuously reads data from the device until no more data is received. It converts the received bytes to hexadecimal format,
+        searches for a specific message index, and prints corresponding messages if enabled. The returned data format depends on the value of
+        `self.ret_hex_int` ("hex", "int", "both", or None).
+
+        Returns:
+            list[str]: List of received data in hexadecimal format if `self.ret_hex_int == "hex"`.
+            list[int]: List of received data as integers if `self.ret_hex_int == "int"`.
+            tuple[list[int], list[str]]: Both integer and hexadecimal lists if `self.ret_hex_int == "both"`.
+            None: If `self.ret_hex_int` is None.
+
+        Raises:
+            BaseException: If message index is not found in the received data.
         """
-
         timeout_count = 0
         received = []
         received_hex = []
@@ -198,7 +258,15 @@ class EIT_16_32_64_128:
 
     def SystemMessageCallback(self):
         """
-        SystemMessageCallback
+        Handles system messages based on the selected serial protocol.
+
+        Depending on the value of `self.serial_protocol`, this method delegates
+        the handling of system messages to the appropriate callback:
+            - If `self.serial_protocol` is "HS", calls `SystemMessageCallback_usb_hs()`.
+            - If `self.serial_protocol` is "FS", calls `SystemMessageCallback_usb_fs()`.
+
+        Raises:
+            AttributeError: If the required callback methods are not defined.
         """
         if self.serial_protocol == "HS":
             self.SystemMessageCallback_usb_hs()
@@ -207,7 +275,17 @@ class EIT_16_32_64_128:
 
     def write_command_string(self, command):
         """
-        Function for writing a command 'bytearray(...)' to the serial port
+        Sends a command string to the device using the appropriate serial protocol.
+
+        Depending on the value of `self.serial_protocol`, the command is sent using either
+        high-speed ("HS") or full-speed ("FS") protocol. After sending the command, the
+        system message callback is triggered.
+
+        Args:
+            command (str): The command string to be sent to the device.
+
+        Raises:
+            AttributeError: If `self.device` does not have the required method for the selected protocol.
         """
         if self.serial_protocol == "HS":
             self.device.write_data(command)
@@ -218,12 +296,29 @@ class EIT_16_32_64_128:
     # --- sciospec device commands
 
     def SoftwareReset(self):
+        """
+        Performs a software reset of the device.
+
+        This method sends a specific command sequence to the device to initiate a software reset.
+        """
         self.print_msg = True
         self.write_command_string(bytearray([0xA1, 0x00, 0xA1]))
         self.print_msg = False
 
     def update_BurstCount(self, burst_count):
+        """
+        Updates the burst count setting and sends the corresponding command to the device.
+
+        Args:
+            burst_count (int): The new burst count value to set.
+
+        Side Effects:
+            - Sets `self.setup.burst_count` to the provided value.
+            - Sends a command to the device using `write_command_string`.
+            - Temporarily sets `self.print_msg` to True during the operation.
         self.print_msg = True
+
+        """
         self.setup.burst_count = burst_count
         self.write_command_string(
             bytearray([0xB0, 0x03, 0x02, 0x00, self.setup.burst_count, 0xB0])
@@ -231,6 +326,20 @@ class EIT_16_32_64_128:
         self.print_msg = False
 
     def update_FrameRate(self, framerate):
+        """
+        Updates the frame rate setting for the device and sends the corresponding command.
+
+        Args:
+            framerate (int): The desired frame rate to set.
+
+        Side Effects:
+            - Sets `self.setup.framerate` to the provided value.
+            - Sends a command to the device to update the frame rate.
+            - Temporarily sets `self.print_msg` to True during the operation.
+
+        Note:
+            The command sent is constructed using the `clTbt_sp` function and numpy's `concatenate`.
+        """
         self.print_msg = True
         self.setup.framerate = framerate
         self.write_command_string(
@@ -244,7 +353,29 @@ class EIT_16_32_64_128:
 
     def SetMeasurementSetup(self, setup: EitMeasurementSetup):
         """
-        set_measurement_config sets the ScioSpec device configuration depending on the EitMeasurementSetup configuration dataclass.
+        Configures the ScioSpec device measurement setup according to the provided EitMeasurementSetup dataclass.
+
+        This method sets various device parameters including burst count, excitation amplitude, ADC range, gain,
+        single-ended mode, excitation switch type, framerate, excitation frequencies, and electrode injection configuration.
+        It also enables output configuration options such as excitation setting, frequency stack row, and timestamp.
+
+        Parameters
+        ----------
+        setup : EitMeasurementSetup
+            The measurement setup configuration containing parameters such as burst count, amplitude, ADC range, gain,
+            framerate, excitation frequency, number of electrodes, and injection skip.
+
+        Raises
+        ------
+        AssertionError
+            If the number of electrodes in the setup does not match the device initialization.
+
+        Notes
+        -----
+        - Amplitude is limited to a maximum of 10mA.
+        - ADC range and gain are set according to predefined device commands.
+        - Electrode injection configuration is set for all electrodes based on the provided setup.
+        - Output configuration is enabled for excitation, frequency stack, and timestamp.
         """
 
         self.setup = setup
@@ -346,14 +477,40 @@ class EIT_16_32_64_128:
         self.print_msg = False
 
     def ResetMeasurementSetup(self):
+        """
+        Resets the measurement setup by sending a specific command to the device.
+
+        This method sets the `print_msg` flag to True, sends a reset command via
+        `write_command_string`, and then sets `print_msg` back to False.
+
+        The command sent is a bytearray: [0xB0, 0x01, 0x01, 0xB0].
+
+        Returns:
+            None
+        """
         self.print_msg = True
         self.write_command_string(bytearray([0xB0, 0x01, 0x01, 0xB0]))
         self.print_msg = False
 
     def GetMeasurementSetup(self, setup_of: str):
         """
-        GetMeasurementSetup
+        Retrieves and configures the measurement setup for the device based on the specified setup option.
 
+        Parameters:
+            setup_of (str): A string identifier for the desired measurement setup option.
+                Supported options include:
+                    - 'Burst Count' (0x02)
+                    - 'Frame Rate' (0x03)
+                    - 'Excitation Frequencies' (0x04)
+                    - 'Excitation Amplitude' (0x05)
+                    - 'Excitation Sequence' (0x06)
+                    - 'Single-Ended or Differential Measure Mode' (0x08)
+                    - 'Gain Settings' (0x09)
+                    - 'Excitation Switch Type' (0x0C)
+
+        Note:
+            This method sends a command to the device to retrieve or configure the specified measurement setup.
+            The actual translation and handling of the response is TBD (to be implemented).
         Burst Count                                    2 -> 0x02
         Frame Rate                                     3 -> 0x03
         Excitation Frequencies                         4 -> 0x04
@@ -371,6 +528,21 @@ class EIT_16_32_64_128:
         self.print_msg = False
 
     def StartStopMeasurement(self, return_as="pot_mat"):
+        """
+        Starts and stops a measurement process using the configured serial protocol (HS or FS).
+        Sends appropriate commands to the device to initiate and terminate measurement.
+        Processes the received data by removing hexadecimal values, reshaping messages into bursts,
+        and splitting bursts into frames. Stores the processed data in `self.data`.
+
+        Args:
+            return_as (str, optional): Specifies the format of the returned data.
+                - "hex": Returns the processed data as a list of hexadecimal values.
+                - "pot_mat": Returns the processed data as a matrix using `get_data_as_matrix()`.
+                Default is "pot_mat".
+
+        Returns:
+            list or matrix: The measurement data in the format specified by `return_as`.
+        """
         if self.serial_protocol == "HS":
             self.device.write_data(bytearray([0xB4, 0x01, 0x01, 0xB4]))
             self.ret_hex_int = "hex"
@@ -404,6 +576,22 @@ class EIT_16_32_64_128:
             return self.get_data_as_matrix()
 
     def get_data_as_matrix(self):
+        """
+        Converts the raw EIT data into a 3D matrix of potentials.
+
+        The resulting matrix has the shape (burst_count, n_el, n_el), where:
+            - burst_count: Number of bursts in the measurement setup.
+            - n_el: Number of electrodes.
+
+        For each burst, the method iterates through its frames, grouping channel data
+        into electrode signals and arranging them in the matrix according to their channel group.
+
+        After processing, self.data is replaced with the resulting matrix.
+
+        Returns:
+            np.ndarray: A 3D complex-valued matrix containing the electrode potentials
+            for each burst and channel group.
+        """
         pot_matrix = np.empty(
             (self.setup.burst_count, self.n_el, self.n_el), dtype=complex
         )
@@ -442,16 +630,51 @@ class EIT_16_32_64_128:
         self.print_msg = False
 
     def GetDeviceInfo(self):
+        """
+        Retrieves device information by sending a specific command to the device.
+
+        This method sets the print_msg flag to True, sends the device info command
+        using `write_command_string`, and then resets the print_msg flag to False.
+
+        Returns:
+            None
+        """
         self.print_msg = True
         self.write_command_string(bytearray([0xD1, 0x00, 0xD1]))
         self.print_msg = False
 
     def GetFirmwareIDs(self):
+        """
+        Sends a command to retrieve firmware IDs from the device.
+
+        This method sets the print_msg flag to True, sends a specific command
+        to the device to request firmware identification, and then resets the
+        print_msg flag to False.
+
+        Returns:
+            None
+        """
         self.print_msg = True
         self.write_command_string(bytearray([0xD2, 0x00, 0xD2]))
         self.print_msg = False
 
     def PowerPlugDetect(self):
+        """
+        Detects the presence of a power plug by sending a specific command to the device.
+
+        This method sets the print_msg flag to True, sends a command to check for power plug detection,
+        and then resets the print_msg flag to False.
+
+        Command sent:
+            - [0xCC, 0x01, 0x81, 0xCC]: Power plug detection command.
+
+        Note:
+            The method does not return any value. It is assumed that the result of the detection
+            is handled elsewhere in the class or by a callback.
+
+        Side Effects:
+            Modifies the self.print_msg attribute.
+        """
         self.print_msg = True
         self.write_command_string(bytearray([0xCC, 0x01, 0x81, 0xCC]))
         self.print_msg = False
