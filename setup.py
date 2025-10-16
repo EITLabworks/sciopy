@@ -4,7 +4,7 @@ setup(
     name="sciopy",
     version="0.8.9",
     packages=find_packages(),
-    author="Jacob Peter Thönes",
+    author="Jacob P. Thönes",
     author_email="jacob.thoenes@uni-rostock.de",
     description="Python based interface module for communication with the Sciospec Electrical Impedance Tomography (EIT) device.",
     long_description=open("README.md").read(),
