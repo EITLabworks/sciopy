@@ -1,6 +1,8 @@
 """Module for interfacing with the Sciospec ISX-3 EIT device via serial communication"""
 
 try:
+    from pyftdi.ftdi import Ftdi
+    from pyftdi.usbtools import UsbTools
     import serial
 except ImportError:
     print("Could not import module: serial")
@@ -52,33 +54,98 @@ class ISX_3:
     A class for interfacing with the Sciospec ISX-3 EIT device.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, VID: hex = 0x0403, PID: hex = 0x89D0) -> None:
         self.print_msg = True
         self.ret_hex_int = None
+        self.VID = VID
+        self.PID = PID
 
-    def connect_device_USB2(self, port: str, baudrate: int = 9600, timeout: int = 1):
+    def info():
+        print("ISX-3v2 EIT device specifications")
+        print(
+            """
+        Frequency
+        range: 100mHz to 10MHz
+        resolution: <10mHz @ f<10kHz
+                <25mHz @ 10kHz ≤ f < 100kHz
+                <150mHz @ 100kHz ≤ f ≤ 10MHz
+        precision absolute: ±100ppm (at 25°C)
+        temperature drift: ±10ppm over operating temperature range
+        long time stability: ±5ppm first year
+
+        Excitation Signal
+        range: 1mV to 1000mV peak-amplitude
+        resolution: 0.1 mV
+        maximum continuous output current: 50 mA
+
+        Output Impedance
+        output impedance: 1Ω (nominal)
+
+        DC Bias (optional)
+        voltage range: -8 V to 8 V
+        voltage resolution: 10 mV
+        current range: -20 mA to 20 mA
+        current resolution: 25µA
+
+        Precision Settings
+        precision range:
+            0 to 1: high speed, lower accuracy
+            1: standard configuration Δ|Z|/|Z|<0.1%
+            1 to 10: high accuracy, low speed
+        averaging: 1 to 1024
+
+        Sweep Setting
+        available sweep parameters: frequency, amplitude, DC bias voltage, DC bias current, kinetic, point delay
+        sweep type: linear, logarithmic, list
+        points: 1 to 2048
+        sweep delay[1]: 0s to 3min in 1µs steps
+        point delay[2]: 0s to 3min in 1µs steps
+
+        [1] Sweep-Delay: Timing delay between two consecutive measurements of complete impedance spectra
+        [2] Point-Delay: Timing delay between two consecutive measurements of single frequencies
         """
-        Connect to USB 2.0 Type B
+        )
+
+    def list_usb_devices(self):
         """
-        if hasattr(self, "USB-FS"):
+        Lists all connected USB devices and checks for the ISX-3 device.
+
+        Returns
+        -------
+        list
+            A list of connected USB devices.
+        """
+        devices = UsbTools.find_all([(self.VID, self.PID)])
+        for device in devices:
+            device_info = {
+                "vendor": hex(device[0].vid),
+                "product": hex(device[0].pid),
+                "description": device[0].description,
+            }
+            if self.print_msg:
+                print(f"Found device: {device_info}")
+
+    def connect_device_FTDI(self):
+        """
+        Connect to the ISX-3 device via FTDI interface.
+        """
+        if hasattr(self, "USB-FD"):
             print(
                 f"Serial connection 'self.serial_protocol' already defined as {self.serial_protocol}."
             )
         else:
-            self.serial_protocol = "USB-FS"
-            self.device = serial.Serial(
-                port=port,
-                baudrate=baudrate,
-                timeout=timeout,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-                bytesize=serial.EIGHTBITS,
-            )
-            print("Connection to", self.device.name, "is established.")
+            self.serial_protocol = "USB-FD"
+            self.device = Ftdi()
+            self.device.open(vendor=self.VID, product=self.PID)
+            print("Connection to", self.device, "is established.")
 
-    def disconnect_device_USB2(self):
-        self.device.close()
-        print("Connection to", self.device.name, "is closed.")
+    def disconnect_device_FTDI(self):
+        """
+        Disconnects the FTDI device.
+        """
+        if hasattr(self, "device"):
+            self.device.close()
+            print("Connection to ISX-3 is closed.")
 
     def SystemMessageCallback(self):
         """
@@ -90,7 +157,7 @@ class ISX_3:
         data_count = 0
 
         while True:
-            buffer = self.device.read()
+            buffer = self.device.read_data(size=4)
             if buffer:
                 received.extend(buffer)
                 data_count += len(buffer)
@@ -128,7 +195,7 @@ class ISX_3:
         """
         Function for writing a command 'bytearray(...)' to the serial port
         """
-        self.device.write(command)
+        self.device.write_data(command)
         self.SystemMessageCallback()
 
     def ResetSystem(self):
