@@ -2,5 +2,4 @@ sphinx
 sphinx-rtd-theme
 sphinx-autodoc-typehints
 sphinxcontrib-napoleon
-sphinx-linkcheck
 nbsphinx
