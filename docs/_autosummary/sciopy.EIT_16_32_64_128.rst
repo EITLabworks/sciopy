@@ -34,6 +34,7 @@
       ~EIT_16_32_64_128.get_data_as_matrix
       ~EIT_16_32_64_128.init_channel_group
       ~EIT_16_32_64_128.update_BurstCount
+      ~EIT_16_32_64_128.update_ExcitationFrequency
       ~EIT_16_32_64_128.update_FrameRate
       ~EIT_16_32_64_128.write_command_string
    

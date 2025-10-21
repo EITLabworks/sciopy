@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 project = "sciopy"
 author = "Jacob P. Thönes"
-release = "0.8.2.2"
+release = "0.8.2.3"
 
 extensions = [
     "sphinx.ext.autodoc",

@@ -32,8 +32,10 @@
       ~ISX_3.StartMeasure
       ~ISX_3.SystemMessageCallback
       ~ISX_3.__init__
-      ~ISX_3.connect_device_USB2
-      ~ISX_3.disconnect_device_USB2
+      ~ISX_3.connect_device_FTDI
+      ~ISX_3.disconnect_device_FTDI
+      ~ISX_3.info
+      ~ISX_3.list_usb_devices
       ~ISX_3.write_command_string
    
    

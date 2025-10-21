@@ -357,6 +357,32 @@ class EIT_16_32_64_128:
         )
         self.print_msg = False
 
+    def update_ExcitationFrequency(self, exc_freq):
+        """
+        update_ExcitationFrequencies _summary_
+
+        Parameters
+        ----------
+        exc_freq int
+            frequency to be set from 100 Hz to 1 MHz
+        """
+        # Set frequencies:
+        # [CT] 0C 04 [fmin] [fmax] [fcount] [ftype] [CT]
+        self.print_msg = True
+        f_min = clTbt_sp(exc_freq)
+        f_max = clTbt_sp(exc_freq)
+        f_count = [0, 1]
+        f_type = [0]  # linear/log
+        # bytearray
+        self.write_command_string(
+            bytearray(
+                list(
+                    np.concatenate([[176, 12, 4], f_min, f_max, f_count, f_type, [176]])
+                )
+            )
+        )
+        self.print_msg = False
+
     def SetMeasurementSetup(self, setup: EitMeasurementSetup):
         """
         Configures the ScioSpec device measurement setup according to the provided EitMeasurementSetup dataclass.

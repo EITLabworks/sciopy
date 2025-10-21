@@ -115,15 +115,19 @@ class ISX_3:
         list
             A list of connected USB devices.
         """
-        devices = UsbTools.find_all([(self.VID, self.PID)])
-        for device in devices:
-            device_info = {
-                "vendor": hex(device[0].vid),
-                "product": hex(device[0].pid),
-                "description": device[0].description,
-            }
+        try:
+            devices = UsbTools.find_all([(self.VID, self.PID)])
+            for device in devices:
+                device_info = {
+                    "vendor": hex(device[0].vid),
+                    "product": hex(device[0].pid),
+                    "description": device[0].description,
+                }
+                if self.print_msg:
+                    print(f"Found device: {device_info}")
+        except Exception as e:
             if self.print_msg:
-                print(f"Found device: {device_info}")
+                print(f"Error listing USB devices: {e}")
 
     def connect_device_FTDI(self):
         """
@@ -157,7 +161,7 @@ class ISX_3:
         data_count = 0
 
         while True:
-            buffer = self.device.read_data(size=4)
+            buffer = self.device.read_data()
             if buffer:
                 received.extend(buffer)
                 data_count += len(buffer)
