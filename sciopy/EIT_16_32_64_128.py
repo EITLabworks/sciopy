@@ -48,7 +48,6 @@ class EIT_16_32_64_128:
             number of electrodes used for measurement.
         """
         self.n_el = n_el
-
         self.channel_group = self.init_channel_group()
         self.print_msg = True
         self.ret_hex_int = None
@@ -523,6 +522,21 @@ class EIT_16_32_64_128:
         self.print_msg = True
         self.write_command_string(bytearray([0xB0, 0x01, 0x01, 0xB0]))
         self.print_msg = False
+
+    def update_measurement_mode(self, meamode="skip4", boundary="external"):
+        meamodeoptions = {"singleended": 0x01, "skip0": 0x02, "skip2": 0x03, "skip4": 0x04}
+        try:
+            cmd = meamodeoptions[meamode]
+        except:
+            print("Option for measurement mode is unknown. Measurement mode ist set to single-ended.")
+            cmd = 0x01
+        if boundary == "external":
+            bnd = "0x02"
+        else:
+            bnd = "0x01"
+        self.write_command_string(bytearray([0xB0, 0x03, 0x08,cmd, bnd,  0xB0]))
+        #todo read out ACK messages
+
 
     def GetMeasurementSetup(self, setup_of: str):
         """
