@@ -28,6 +28,8 @@ class EitMeasurementSetup:
     inj_skip: Union[int, list]
     gain: int
     adc_range: int
+    mea_mode: str = "singleended"
+    mea_mode_boundary: str = "external"
     # TBD: lin/log/sweep
 
 
