@@ -256,6 +256,7 @@ def split_bursts_in_frames(
         channel depending burst frames
     """
     msg_len = 140  # Constant
+    iC= 0
     frame = []  # Channel group depending frame
     burst_frame = []  # single burst count frame with channel depending frame
     subframe_length = split_list.shape[1] // msg_len
@@ -266,6 +267,10 @@ def split_bursts_in_frames(
             # Select the right channel group data
             if parsed_sgl_frame.channel_group in channel_group:
                 frame.append(parsed_sgl_frame)
+
+            else:
+                iC+=1
         burst_frame.append(frame)
         frame = []  # Reset channel depending single burst frame
+    print("UNUSED CG "+ str(iC))
     return np.array(burst_frame)

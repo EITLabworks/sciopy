@@ -40,7 +40,7 @@ def byte_parser():
     piCurrMess = []
     fMesstype = None
     iCurrLen = 0
-    data = yield                        # Data of dataclass Bytes
+    data = yield    # Data of dataclass Bytes
     while True:
         piCurrMess.extend(data)         # Starting Message = Message Type
                                         # Automatic conversion to integers within list
@@ -48,7 +48,7 @@ def byte_parser():
 
         data = yield []                 # 2 Byte = Length of Data within message
         iCurrLen = int.from_bytes(data)
-        print(iCurrLen)
+       # print(iCurrLen) #todo raus
         piCurrMess.extend(data)
 
         data = yield []                 # Next iCurrLen Bytes = Actual Data Bytes
@@ -62,6 +62,7 @@ def byte_parser():
         iCurrLen = 0
         data = yield piCurrMess         # Return fully parsed message as list
         piCurrMess = []
+        
 
 
 #todo doku
@@ -161,10 +162,7 @@ class MessageParser:
             if timeout_count >= 100:
                 # Break if we haven't received any data
                 break
-        print(f"{iMessageCount} messages received.")
-        if self.bPrintMessages:
-            for message in self.ppcData:
-                print(message)
+        print(f"{iMessageCount} message(s) received.")
         return self.ppcData
 
     def read_usb_till_timeout(self,  bSaveData=False, bDeleteDataFrame=False, sSavePath="C/"):
@@ -185,10 +183,7 @@ class MessageParser:
                 # Break if we haven't received any data
                 break
 
-        print(f"{iMessageCount} messages received.")
-        if self.bPrintMessages:
-            for message in self.ppcData:
-                print(message)
+        print(f"{iMessageCount} message(s) received.")
         return self.ppcData
 
 
@@ -196,7 +191,7 @@ class MessageParser:
         np.savez(path + "eitsample_{0:06d}.npz".format(self.iNPZSaveIndex),
                  #   aorta=aorta_segs[j],
                  excitation_stgs =dataframe.excitation_stgs,
-                 frequency_row=dataframe.frequency_row,
+                 frequency_stgs=dataframe.frequency_stgs,
                  timestamp1=dataframe.timestamp1,
                  timestamp2=dataframe.timestamp2,
                  ppcData=dataframe.ppcData)
@@ -206,6 +201,7 @@ class MessageParser:
 
     # Message Interpreter Sciospec EIT
     def interpret_message(self, message, bSaveData=False, bDeleteDataFrame=False, sSavePath= "C/"):
+        mess_hex = [hex(receive) for receive in message]
         if message[0] == 180:       # DATA 0XB4
             self.interpret_data_input(message, bSaveData, bDeleteDataFrame, sSavePath)
         else:
@@ -216,8 +212,8 @@ class MessageParser:
                         print("Message: " +str(mess_hex) +" -> "+ msg_dict[mess_hex[2]])
                     except:
                         print("Message: " +str(mess_hex) +" -> "+msg_dict["0x01"])
-            else:
-                print("Unknown received message: "+str(mess_hex))
+                else:
+                    print("Unknown received message: "+str(mess_hex))
 
     def reset_new_data_frame(self):
         self.iInjIndex= 0
@@ -237,38 +233,38 @@ class MessageParser:
 
         # EXCITATIONSETTING
         freq_group = two_byte_to_int(message[5:7])
-        if message[2] == 1 and freq_group == 1:
-            self.CurrentFrame.excitation_stgs[self.iInjIndex] = [message[3], message[4]]
-            self.iInjIndex += 1
+        if message[2] <= self.iMaxChannelGroups:# Necessary, since sometimes all four channel groups are send
+            if message[2] == 1 and freq_group == 1:
+                self.CurrentFrame.excitation_stgs[self.iInjIndex] = [message[3], message[4]]
+                self.iInjIndex += 1
+    
+            # FREQUENCY ROW is set through eitsetup
+            #   self.CurrentFrame.frequency_stgs = self.iNumFreqSettings
+    
+            #TIMESTAMP
+            if self.iSaveCounter == 0:
+                self.CurrentFrame.timestamp1 = four_byte_to_int(message[7:11])
 
-        # FREQUENCY ROW is set through eitsetup
-        #   self.CurrentFrame.frequency_stgs = self.iNumFreqSettings
-
-        #TIMESTAMP
-        if self.iSaveCounter == 0:
-            self.CurrentFrame.timestamp1 = four_byte_to_int(message[7:11])
-
-        # Data Handling
-        for i in range(11, 135, 8):
-            data = complex(
-                four_byte_to_int(message[i: i + 4]),
-                four_byte_to_int(message[i + 4: i + 8]),
-            )
-            self.CurrentFrame.ppcData[self.iSaveCounter] = data
-            self.iSaveCounter += 1
-
-        if self.iSaveCounter == self.iLenDataperFrame:
-            # Frame Full
-            self.CurrentFrame.timestamp2 = four_byte_to_int(message[7:11])
-            if bSave:
-                self.save_data_frame(sSavePath, self.CurrentFrame)
-            if bDeleteFrame:
-                del self.CurrentFrame
-            else:
-                self.ppcData.append(self.CurrentFrame)
-
-            self.reset_new_data_frame()
-        # extract
+            # Data Handling
+            for i in range(11, 135, 8):
+                data = complex(
+                    four_byte_to_int(message[i: i + 4]),
+                    four_byte_to_int(message[i + 4: i + 8]),
+                )
+                self.CurrentFrame.ppcData[self.iSaveCounter] = data
+                self.iSaveCounter += 1
+            if self.iSaveCounter == self.iLenDataperFrame:
+                # Frame Full
+                self.CurrentFrame.timestamp2 = four_byte_to_int(message[7:11])
+                if bSave:
+                    self.save_data_frame(sSavePath, self.CurrentFrame)
+                if bDeleteFrame:
+                    del self.CurrentFrame
+                else:
+                    self.ppcData.append(self.CurrentFrame)         
+    
+                self.reset_new_data_frame()
+            # extract
 
 @dataclass
 class EITFrame:
@@ -306,15 +302,15 @@ class EITFrame:
 def make_eitframes_hex(FrameList):
     result= []
     for f in FrameList:
-        result.append(hex(f))
+        result.append(hex(f.ppcData))
     return result
 
 
 def get_data_as_matrix(FrameList):
     result= []
     for f in FrameList:
-        L = len(f.ppcData)//(f.excitation_stgs)
-        result.append(np.reshape(f.ppcData,(f.excitation_stgs, L)))
+        L = len(f.ppcData)//len(f.excitation_stgs)
+        result.append(np.reshape(f.ppcData,(len(f.excitation_stgs), L)))
     return np.array(result)
 
 

@@ -499,9 +499,9 @@ class EIT_16_32_64_128:
             print("Option for measurement mode is unknown. Measurement mode ist set to single-ended.")
             cmd = 0x01
         if boundary == "external":
-            bnd = "0x02"
+            bnd = 0x02
         else:
-            bnd = "0x01"
+            bnd = 0x01
         self.write_command_string(bytearray([0xB0, 0x03, 0x08, cmd, bnd, 0xB0]))
         self.print_msg = False
         #todo read out ACK messages
@@ -579,7 +579,7 @@ class EIT_16_32_64_128:
         if return_as == "hex":
             return self.data
         elif return_as == "pot_mat":
-            return self.get_data_as_matrix(self.data)
+            return self.get_data_as_matrix()
 
     #todo check
     def StartStopMeasurementNew(self, timeout:int=0, return_as="pot_mat", bSaveData:bool=False, bDeleteData:bool=False,
@@ -609,29 +609,32 @@ class EIT_16_32_64_128:
         """
 
         # Start measurement
+        self.cMessageParser.ppcData=[]
+                                    
         self.send_message(bytearray([0xB4, 0x01, 0x01, 0xB4]))
         self.cMessageParser.bPrintMessages = False
         if timeout != 0:
-            data = self.cMessageParser.read_usb_for_seconds(timeout, bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,
-                                                            sSavepath=sSavepath)
+            self.cMessageParser.read_usb_for_seconds(timeout, bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,
+                                                            sSavePath=sSavepath)
         else:
             if self.setup.burst_count ==0:
                 print("Burst count for this setup needs to be >=1")
                 return
-            data = self.cMessageParser.read_usb_till_timeout(bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,
-                                                             sSavepath=sSavepath)
+            self.cMessageParser.read_usb_till_timeout(bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,sSavePath=sSavepath)
 
         # Stop measurement
         self.send_message(bytearray([0xB4, 0x01, 0x00, 0xB4]))
-        data2 = self.cMessageParser.read_usb_till_timeout(bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,
-                                                          sSavepath=sSavepath)
-        data = data + data2
+      #  self.cMessageParser.ppcData=[]                            
+        data = self.cMessageParser.read_usb_till_timeout(bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,
+                                                          sSavePath=sSavepath)                           
         if bDeleteData:
             return
         if return_as == "hex":
             return make_eitframes_hex(data)
         elif return_as == "pot_mat":
             return get_data_as_matrix(data)
+        elif return_as == "eitframe":
+            return data
 
     def get_data_as_matrix(self):
         """
