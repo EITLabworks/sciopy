@@ -127,7 +127,7 @@ def reshape_full_message_in_bursts(lst: list, ssms: EitMeasurementSetup) -> np.n
     # split in burst count messages
     split_length = lst.shape[0] // ssms.burst_count
     for split in range(ssms.burst_count):
-        split_list.append(lst[split * split_length : (split + 1) * split_length])
+        split_list.append(lst[split * split_length: (split + 1) * split_length])
     return np.array(split_list)
 
 
@@ -164,11 +164,48 @@ def bytesarray_to_float(bytes_array: np.ndarray) -> float:
     Returns
     -------
     float
-        double precision float
+        single precision float
     """
     bytes_array = [int(b, 16) for b in bytes_array]
     bytes_array = bytes(bytes_array)
     return struct.unpack("!f", bytes(bytes_array))[0]
+
+
+
+def byteintarray_to_float(bytes_array: np.ndarray) -> float:
+    """
+    Converts a bytes array to a float number. Array is array of integers representing bytes.
+
+    Parameters
+    ----------
+    bytes_array : np.ndarray
+        array of integers former being bytes
+
+    Returns
+    -------
+    float
+        single precision float
+    """
+    return struct.unpack("!f", bytes(bytes_array))[0]
+
+
+def bytesarray_to_double(bytes_array: np.ndarray) -> float:
+    """
+    Converts a bytes array to a float number.
+
+    Parameters
+    ----------
+    bytes_array : np.ndarray
+        array of bytes
+
+    Returns
+    -------
+    float
+        double precision float
+    """
+    bytes_array = [int(b, 16) for b in bytes_array]
+    bytes_array = bytes(bytes_array)
+    return struct.unpack("!d", bytes(bytes_array))[0]
 
 
 def bytesarray_to_byteslist(bytes_array: np.ndarray) -> list:
@@ -207,6 +244,61 @@ def bytesarray_to_int(bytes_array: np.ndarray) -> int:
     return int.from_bytes(bytes_array, "big")
 
 
+TWOPOWER24 = 16777216
+TWOPOWER16 = 65536
+TWOPOWER8 = 256
+
+
+def four_byte_to_int(bytelist):
+    """
+    Converts a list of 4 integers representing bytes to int.
+
+    Parameters
+    ----------
+    bytelist : np.ndarray/list of integers representing bytes MSB first
+
+    Returns
+    -------
+    int
+        integer number
+    """
+    return TWOPOWER24 * bytelist[0] + TWOPOWER16 * bytelist[1] + TWOPOWER8 * bytelist[2] + bytelist[3]
+
+
+def two_byte_to_int(bytelist):
+    """
+    Converts a list of 2 integers representing bytes to int.
+
+    Parameters
+    ----------
+    bytelist : np.ndarray/list of integers representing bytes MSB first
+
+    Returns
+    -------
+    int
+        integer number
+    """
+    return TWOPOWER8 * bytelist[0] + bytelist[1]
+
+
+def bytelist_to_int(bytelist):
+    """
+    Converts a list of integers representing bytes MSB first to int.
+    Parameters
+    ----------
+    bytelist : np.ndarray/list of integers representing bytes MSB first
+
+    Returns
+    -------
+    int
+        integer number
+    """
+    r = bytelist[-1]
+    for j in range(2, len(bytelist)):
+        r += bytelist[-j] * 2 ** ((j - 1) * 8)
+    return r
+
+
 def parse_single_frame(lst_ele: np.ndarray) -> SingleFrame:
     """
     Parse single data to the class SingleFrame.
@@ -226,8 +318,8 @@ def parse_single_frame(lst_ele: np.ndarray) -> SingleFrame:
     for i in range(11, 135, 8):
         enum += 1
         channels[f"ch_{enum}"] = complex(
-            bytesarray_to_float(lst_ele[i : i + 4]),
-            bytesarray_to_float(lst_ele[i + 4 : i + 8]),
+            bytesarray_to_float(lst_ele[i: i + 4]),
+            bytesarray_to_float(lst_ele[i + 4: i + 8]),
         )
 
     excitation_stgs = np.array([single_hex_to_int(ele) for ele in lst_ele[3:5]])
@@ -245,7 +337,7 @@ def parse_single_frame(lst_ele: np.ndarray) -> SingleFrame:
 
 
 def split_bursts_in_frames(
-    split_list: np.ndarray, burst_count: int, channel_group: list
+        split_list: np.ndarray, burst_count: int, channel_group: list
 ) -> np.ndarray:
     """
     Takes the splitted list from `reshape_full_message_in_bursts()` and parses the single frames.
@@ -256,7 +348,7 @@ def split_bursts_in_frames(
         channel depending burst frames
     """
     msg_len = 140  # Constant
-    iC= 0
+    iC = 0
     frame = []  # Channel group depending frame
     burst_frame = []  # single burst count frame with channel depending frame
     subframe_length = split_list.shape[1] // msg_len
@@ -269,8 +361,8 @@ def split_bursts_in_frames(
                 frame.append(parsed_sgl_frame)
 
             else:
-                iC+=1
+                iC += 1
         burst_frame.append(frame)
         frame = []  # Reset channel depending single burst frame
-    print("UNUSED CG "+ str(iC))
+    print("UNUSED CG " + str(iC))
     return np.array(burst_frame)
