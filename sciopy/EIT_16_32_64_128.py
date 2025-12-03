@@ -583,7 +583,7 @@ class EIT_16_32_64_128:
 
     #todo check
     def StartStopMeasurementNew(self, timeout:int=0, return_as="pot_mat", bSaveData:bool=False, bDeleteData:bool=False,
-                                sSavepath:str="C/"):
+                                sSavepath:str="C/", bResultsFolder=True):
         """
         Starts and stops a measurement process using the configured serial protocol (HS or FS).
         Sends appropriate commands to the device to initiate and terminate measurement.
@@ -609,24 +609,27 @@ class EIT_16_32_64_128:
         """
 
         # Start measurement
-        self.cMessageParser.ppcData=[]
+        self.cMessageParser.clear_out_data()
+        if bResultsFolder:
+            self.cMessageParser.make_results_folder(bResultsFolder, bSaveData, sSavepath)
                                     
         self.send_message(bytearray([0xB4, 0x01, 0x01, 0xB4]))
         self.cMessageParser.bPrintMessages = False
         if timeout != 0:
             self.cMessageParser.read_usb_for_seconds(timeout, bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,
-                                                            sSavePath=sSavepath)
+                                                            sSavePath=sSavepath,bResultsFolder=False )
         else:
             if self.setup.burst_count ==0:
                 print("Burst count for this setup needs to be >=1")
                 return
-            self.cMessageParser.read_usb_till_timeout(bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,sSavePath=sSavepath)
+            self.cMessageParser.read_usb_till_timeout(bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,sSavePath=sSavepath, bResultsFolder=False)
 
         # Stop measurement
         self.send_message(bytearray([0xB4, 0x01, 0x00, 0xB4]))
-      #  self.cMessageParser.ppcData=[]                            
+        # All data is returned if wanted
         data = self.cMessageParser.read_usb_till_timeout(bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,
-                                                          sSavePath=sSavepath)                           
+                                                          sSavePath=sSavepath, bResultsFolder=False)
+
         if bDeleteData:
             return
         if return_as == "hex":

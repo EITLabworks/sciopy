@@ -15,6 +15,7 @@ import os
 from pandas.core.interchange import dataframe
 import struct
 from .sciopy_dataclasses import EitMeasurementSetup
+from .com_util import bytesarray_to_float, byteintarray_to_float, two_byte_to_int
 
 TWOPOWER24 = 16777216
 TWOPOWER16 = 65536
@@ -70,13 +71,14 @@ class MessageParser:
     def __init__(self, device, eitsetup=None, devicetype="FS"):
         # General setup
 
-        self.bCreateResultsFolder = True
+
         self.bPrintMessages = False
         self.iNPZSaveIndex = 1
         self.iSaveCounter = 0
         self.ppiMessages = []           # Unused
         self.ppcData = []
         self.iInjIndex = 0
+        self.sCurrentPath=""
 
         # Device setup
         self.cDevice = device
@@ -113,6 +115,9 @@ class MessageParser:
             # ALL needed
             self.reset_new_data_frame()
 
+    def clear_out_data(self):
+        self.ppcData = []
+
 
     def init_parser(self):
         self.Parser= byte_parser()
@@ -130,14 +135,17 @@ class MessageParser:
     def send_hs(self, tosend):
         self.cDevice.write_data(tosend)
 
-
-    def read_usb_for_seconds(self, fTime, bSaveData=False, bDeleteDataFrame=False, sSavePath="C/"):
-        if self.bCreateResultsFolder and bSaveData:
+    def make_new_folder(self, bCreateResultsFolder,bSaveData, sSavePath):
+        if bSaveData and bCreateResultsFolder:
             timestr = time.strftime("%Y%m%d-%H%M%S_eit")
             path = os.path.join(sSavePath, timestr)
             os.mkdir(path)
-            sSavePath = path + "/"
-        messages = []
+            self.sCurrentPath = path + "/"
+        else:
+            self.sCurrentPath = sSavePath
+
+    def read_usb_for_seconds(self, fTime, bSaveData=False, bDeleteDataFrame=False, sSavePath="C/", bResultsFolder=False):
+        self.make_new_folder(bResultsFolder, bSaveData, sSavePath)
         iMessageCount= 0
         bMessageStarted = False
         timeout_count= 0
@@ -149,7 +157,7 @@ class MessageParser:
 
                 if len(message) > 0:
                     bMessageStarted = False
-                    self.interpret_message(message, bSaveData,bDeleteDataFrame,sSavePath)
+                    self.interpret_message(message, bSaveData,bDeleteDataFrame,self.sCurrentPath)
                     iMessageCount += 1
                 else:
                     bMessageStarted = True
@@ -165,8 +173,8 @@ class MessageParser:
         print(f"{iMessageCount} message(s) received.")
         return self.ppcData
 
-    def read_usb_till_timeout(self,  bSaveData=False, bDeleteDataFrame=False, sSavePath="C/"):
-        messages= []
+    def read_usb_till_timeout(self,  bSaveData=False, bDeleteDataFrame=False, sSavePath="C/", bResultsFolder=False):
+        self.make_new_folder(bResultsFolder, bSaveData, sSavePath)
         iMessageCount = 0
         timeout_count = 0
         while True:
@@ -174,7 +182,7 @@ class MessageParser:
             if buffer:
                 message= self.Parser.send(buffer)
                 if len(message)>0:
-                    self.interpret_message(message, bSaveData,bDeleteDataFrame,sSavePath)
+                    self.interpret_message(message, bSaveData,bDeleteDataFrame,self.sCurrentPath)
                     iMessageCount += 1
                 timeout_count = 0
                 continue
@@ -243,19 +251,19 @@ class MessageParser:
     
             #TIMESTAMP
             if self.iSaveCounter == 0:
-                self.CurrentFrame.timestamp1 = four_byte_to_int(message[7:11])
+                self.CurrentFrame.timestamp1 = (message[7:11])
 
             # Data Handling
             for i in range(11, 135, 8):
                 data = complex(
-                    four_byte_to_int(message[i: i + 4]),
-                    four_byte_to_int(message[i + 4: i + 8]),
+                    byteintarray_to_float(message[i: i + 4]),
+                    byteintarray_to_float(message[i + 4: i + 8]),
                 )
                 self.CurrentFrame.ppcData[self.iSaveCounter] = data
                 self.iSaveCounter += 1
             if self.iSaveCounter == self.iLenDataperFrame:
                 # Frame Full
-                self.CurrentFrame.timestamp2 = four_byte_to_int(message[7:11])
+                self.CurrentFrame.timestamp2 = byteintarray_to_float(message[7:11])
                 if bSave:
                     self.save_data_frame(sSavePath, self.CurrentFrame)
                 if bDeleteFrame:
@@ -266,6 +274,8 @@ class MessageParser:
                 self.reset_new_data_frame()
             # extract
 
+
+# -------------------------------------------------------------------------------------------------------------------- #
 @dataclass
 class EITFrame:
     """
@@ -299,7 +309,13 @@ class EITFrame:
         return hex(self.ppcData)
 
 
+
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# -------------------------------------------------------------------------------------------------------------------- #
 def make_eitframes_hex(FrameList):
+    #todo, so funktionierts nicht
     result= []
     for f in FrameList:
         result.append(hex(f.ppcData))
@@ -321,32 +337,6 @@ def load_eit_frames(path,names):
 def load_eit_frames_into_nparray(path):
     # Loads NPZ Data into nparray of [NumFrames X Sizeof Frequency and Excitation Settings]
     pass
-
-
-
-def four_byte_to_int(bytelist):
-    return TWOPOWER24*bytelist[0] + TWOPOWER16* bytelist[1] +TWOPOWER8* bytelist[2] + bytelist[3]
-
-def two_byte_to_int(bytelist):
-    return TWOPOWER8* bytelist[0] + bytelist[1]
-
-def bytelist_to_int(bytelist):
-    r= bytelist[-1]
-    for j in range(2,len(bytelist)):
-        r+= bytelist[-j]* 2**((j-1)*8)
-    return r
-
-
-def fourbytetst(bytes_array):
-    bytes_array = [int(b, 16) for b in bytes_array]
-    bytes_array = bytes(bytes_array)
-    s= struct.unpack("!f", bytes(bytes_array))
-    return struct.unpack("!f", bytes(bytes_array))[0]
-
-def byteintlist_to_int(bytelist):
-    #faster than four bytes to int at the moment
-    bytes_array = bytes(bytelist)
-    return int.from_bytes(bytes_array, byteorder='big')
 
 
 
