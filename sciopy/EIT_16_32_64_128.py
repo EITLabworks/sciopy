@@ -29,7 +29,8 @@ msg_dict = {
 }
 
 from .sciopy_dataclasses import EitMeasurementSetup
-from sciopydev.sciopy.usb_message_parser import MessageParser, make_eitframes_hex, get_data_as_matrix
+from sciopydev.sciopy.usb_message_parser import (MessageParser, make_eitframes_hex, get_data_as_matrix,
+                                                 make_results_folder)
 
 
 class EIT_16_32_64_128:
@@ -581,7 +582,7 @@ class EIT_16_32_64_128:
         elif return_as == "pot_mat":
             return self.get_data_as_matrix()
 
-    #todo check
+
     def StartStopMeasurementNew(self, timeout:int=0, return_as="pot_mat", bSaveData:bool=False, bDeleteData:bool=False,
                                 sSavepath:str="C/", bResultsFolder=True):
         """
@@ -599,8 +600,8 @@ class EIT_16_32_64_128:
                 - "pot_mat": Returns the processed data as a matrix using `get_data_as_matrix()`.
                 Default is "pot_mat".
                 - else: data is only stored
-            bSaveData (bool): Specifies if a the measured data is saved in NPZ format
-            bDeleteData (bool): Specifies if a the measured data is deleted out of memory after each EITframe, with
+            bSaveData (bool): Specifies if the measured data is saved in NPZ format
+            bDeleteData (bool): Specifies if the measured data is deleted out of memory after each EITframe, with
                 bSaveData=True, measured data is saved and then removed from RAM
             sSavepath (str): Specifies the sPath where the measured data is saved.
 
@@ -610,14 +611,13 @@ class EIT_16_32_64_128:
 
         # Start measurement
         self.cMessageParser.clear_out_data()
-        if bResultsFolder:
-            self.cMessageParser.make_results_folder(bResultsFolder, bSaveData, sSavepath)
+        sCurrentPath= make_results_folder(bResultsFolder, bSaveData, sSavepath) # No new path is created  if bResultsFolder=False
                                     
         self.send_message(bytearray([0xB4, 0x01, 0x01, 0xB4]))
         self.cMessageParser.bPrintMessages = False
         if timeout != 0:
             self.cMessageParser.read_usb_for_seconds(timeout, bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,
-                                                            sSavePath=sSavepath,bResultsFolder=False )
+                                                            sSavePath=sCurrentPath,bResultsFolder=False )
         else:
             if self.setup.burst_count ==0:
                 print("Burst count for this setup needs to be >=1")
@@ -628,7 +628,7 @@ class EIT_16_32_64_128:
         self.send_message(bytearray([0xB4, 0x01, 0x00, 0xB4]))
         # All data is returned if wanted
         data = self.cMessageParser.read_usb_till_timeout(bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,
-                                                          sSavePath=sSavepath, bResultsFolder=False)
+                                                          sSavePath=sCurrentPath, bResultsFolder=False)
 
         if bDeleteData:
             return
@@ -638,6 +638,8 @@ class EIT_16_32_64_128:
             return get_data_as_matrix(data)
         elif return_as == "eitframe":
             return data
+
+
 
     def get_data_as_matrix(self):
         """
