@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Union
 import numpy.typing as npt
 
+
 @dataclass
 class EitMeasurementSetup:
     """
@@ -213,7 +214,6 @@ class PreperationConfig:
     n_samples: int
 
 
-
 # -------------------------------------------------------------------------------------------------------------------- #
 @dataclass
 class EITFrame:
@@ -233,11 +233,10 @@ class EITFrame:
                  for f in used frequency stages:
                     for c in all used channels: -> insert complex value
     """
+
     n_el: int  # Number of used electrodes
     excitation_stgs: npt.NDArray[int]  # Num Excitation Settings X 2
     frequency_stgs: npt.NDArray[int]  # List of Frequency-Sweep Settings,
     timestamp1: int  # [ms]
     timestamp2: int
     ppcData: npt.NDArray[complex]  # Channels 1-(64) all channel groups combined
-
-

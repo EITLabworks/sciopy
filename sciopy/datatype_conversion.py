@@ -13,6 +13,7 @@ TWOPOWER24 = 16777216
 TWOPOWER16 = 65536
 TWOPOWER8 = 256
 
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
 def del_hex_in_list(lst: list) -> np.ndarray:
@@ -169,7 +170,12 @@ def four_byte_to_int(bytelist):
     int
         integer number
     """
-    return TWOPOWER24 * bytelist[0] + TWOPOWER16 * bytelist[1] + TWOPOWER8 * bytelist[2] + bytelist[3]
+    return (
+        TWOPOWER24 * bytelist[0]
+        + TWOPOWER16 * bytelist[1]
+        + TWOPOWER8 * bytelist[2]
+        + bytelist[3]
+    )
 
 
 # -------------------------------------------------------------------------------------------------------------------- #

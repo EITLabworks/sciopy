@@ -5,6 +5,7 @@ File : usb_message_parser.py
 Author ：Patricia Fuchs
 Date ：17.11.2025 09:04
 """
+
 import numpy as np
 import time
 
@@ -61,7 +62,8 @@ def byte_parser():
 
         if fMesstype != data:  # Last Byte != Message Type
             print(
-                f"Current message not complete for Starting messagetype {hex(fMesstype)} and ending type {hex(data[0])}")
+                f"Current message not complete for Starting messagetype {hex(fMesstype)} and ending type {hex(data[0])}"
+            )
         piCurrMess.extend(data)
         iCurrLen = 0
         data = yield piCurrMess  # Return fully parsed message as list
@@ -114,10 +116,19 @@ class MessageParser:
         self.setup = setup
         if setup != None:
             self.iMaxChannelGroups = setup.n_el // 16
-            self.iNumExcitationSettings = setup.n_el    # todo should be independently set
-            self.iNumFreqSettings = 1                   # todo
-            self.iLenDataperFrame = self.iMaxChannelGroups * 16 * self.iNumExcitationSettings * self.iNumFreqSettings
-            self.iMessagesperFrame = self.iMaxChannelGroups * self.iNumExcitationSettings * self.iNumFreqSettings
+            self.iNumExcitationSettings = setup.n_el  # todo should be independently set
+            self.iNumFreqSettings = 1  # todo
+            self.iLenDataperFrame = (
+                self.iMaxChannelGroups
+                * 16
+                * self.iNumExcitationSettings
+                * self.iNumFreqSettings
+            )
+            self.iMessagesperFrame = (
+                self.iMaxChannelGroups
+                * self.iNumExcitationSettings
+                * self.iNumFreqSettings
+            )
 
             # ALL needed
             self.reset_new_data_frame()
@@ -129,14 +140,17 @@ class MessageParser:
         """
         self.iInjIndex = 0
         self.iSaveCounter = 0
-        self.CurrentFrame = EITFrame(n_el=self.setup.n_el,
-                                     excitation_stgs=np.zeros((self.iNumExcitationSettings, 2), dtype=int),
-                                     frequency_stgs=np.zeros((self.iNumFreqSettings,), dtype=int),
-                                     # todo fill in setup freq settings
-                                     timestamp1=0,
-                                     timestamp2=0,
-                                     ppcData=np.zeros(self.iMaxChannelGroups * 16 * self.iNumExcitationSettings,
-                                                      dtype=complex))
+        self.CurrentFrame = EITFrame(
+            n_el=self.setup.n_el,
+            excitation_stgs=np.zeros((self.iNumExcitationSettings, 2), dtype=int),
+            frequency_stgs=np.zeros((self.iNumFreqSettings,), dtype=int),
+            # todo fill in setup freq settings
+            timestamp1=0,
+            timestamp2=0,
+            ppcData=np.zeros(
+                self.iMaxChannelGroups * 16 * self.iNumExcitationSettings, dtype=complex
+            ),
+        )
 
     # ---------------------------------------------------------------------------------------------------------------- #
     def clear_out_data(self):
@@ -190,8 +204,13 @@ class MessageParser:
         self.cDevice.write_data(tosend)
 
     # ---------------------------------------------------------------------------------------------------------------- #
-    def read_usb_for_seconds(self, fTime: float, bSaveData: bool = False, bDeleteDataFrame: bool = False,
-                             sSavePath: str = "C/"):
+    def read_usb_for_seconds(
+        self,
+        fTime: float,
+        bSaveData: bool = False,
+        bDeleteDataFrame: bool = False,
+        sSavePath: str = "C/",
+    ):
         """
         Reads out the USB connection for fTime seconds, regardless of whether data is received. Data bytes are parsed,
         sorted into full messages and then handled according to their Command Tag. Status or requested information is
@@ -215,7 +234,9 @@ class MessageParser:
 
                 if len(message) > 0:
                     bMessageStarted = False
-                    self.interpret_message(message, bSaveData, bDeleteDataFrame, sSavePath)
+                    self.interpret_message(
+                        message, bSaveData, bDeleteDataFrame, sSavePath
+                    )
                     iMessageCount += 1
                 else:
                     bMessageStarted = True
@@ -232,7 +253,9 @@ class MessageParser:
         return self.ppcData
 
     # ---------------------------------------------------------------------------------------------------------------- #
-    def read_usb_till_timeout(self, bSaveData=False, bDeleteDataFrame=False, sSavePath="C/"):
+    def read_usb_till_timeout(
+        self, bSaveData=False, bDeleteDataFrame=False, sSavePath="C/"
+    ):
         """
         Reads out the USB connection until the connections times out, so for messages received + timeout. Data bytes are parsed,
         sorted into full messages and then handled according to their Command Tag. Status or requested information is
@@ -251,7 +274,9 @@ class MessageParser:
             if buffer:
                 message = self.Parser.send(buffer)
                 if len(message) > 0:
-                    self.interpret_message(message, bSaveData, bDeleteDataFrame, sSavePath)
+                    self.interpret_message(
+                        message, bSaveData, bDeleteDataFrame, sSavePath
+                    )
                     iMessageCount += 1
                 timeout_count = 0
                 continue
@@ -264,7 +289,9 @@ class MessageParser:
         return self.ppcData
 
     # ---------------------------------------------------------------------------------------------------------------- #
-    def interpret_message(self, message, bSaveData=False, bDeleteDataFrame=False, sSavePath="C/"):
+    def interpret_message(
+        self, message, bSaveData=False, bDeleteDataFrame=False, sSavePath="C/"
+    ):
         """
         Message interpreter for USB messages from the Sciospec EIT Device. Status messages or requested information is
         displayed, recorded EIT data is separetely stored.
@@ -281,14 +308,18 @@ class MessageParser:
             if self.bPrintMessages:
                 if message[0] == 24:  # 0x24 Acknowledgement Message
                     try:
-                        print("Message: " + str(mess_hex) + " -> " + msg_dict[mess_hex[2]])
+                        print(
+                            "Message: " + str(mess_hex) + " -> " + msg_dict[mess_hex[2]]
+                        )
                     except:
                         print("Message: " + str(mess_hex) + " -> " + msg_dict["0x01"])
                 else:
                     print("Unknown received message: " + str(mess_hex))
 
     # ---------------------------------------------------------------------------------------------------------------- #
-    def interpret_data_input(self, message, bSave=False, bDeleteFrame=False, sSavePath="C/"):
+    def interpret_data_input(
+        self, message, bSave=False, bDeleteFrame=False, sSavePath="C/"
+    ):
         """
         Interpreter of received messages with measured data.
         Args:
@@ -299,24 +330,29 @@ class MessageParser:
         """
         # EXCITATIONSETTING
         freq_group = two_byte_to_int(message[5:7])
-        if message[2] <= self.iMaxChannelGroups:  # Necessary, since  all four channel groups are send
+        if (
+            message[2] <= self.iMaxChannelGroups
+        ):  # Necessary, since  all four channel groups are send
             if message[2] == 1 and freq_group == 1:
-                self.CurrentFrame.excitation_stgs[self.iInjIndex] = [message[3], message[4]]
+                self.CurrentFrame.excitation_stgs[self.iInjIndex] = [
+                    message[3],
+                    message[4],
+                ]
                 self.iInjIndex += 1
 
-        # FREQUENCY ROW is set through eitsetup
-        #TODO input not the number of the frequency row, but all injected frequencies, beforehand
-        #   self.CurrentFrame.frequency_stgs = self.iNumFreqSettings
+            # FREQUENCY ROW is set through eitsetup
+            # TODO input not the number of the frequency row, but all injected frequencies, beforehand
+            #   self.CurrentFrame.frequency_stgs = self.iNumFreqSettings
 
-        # TIMESTAMP
+            # TIMESTAMP
             if self.iSaveCounter == 0:
-                self.CurrentFrame.timestamp1 = (message[7:11])
+                self.CurrentFrame.timestamp1 = message[7:11]
 
-        # Data Handling
+            # Data Handling
             for i in range(11, 135, 8):
                 data = complex(
-                    byteintarray_to_float(message[i: i + 4]),
-                    byteintarray_to_float(message[i + 4: i + 8]),
+                    byteintarray_to_float(message[i : i + 4]),
+                    byteintarray_to_float(message[i + 4 : i + 8]),
                 )
                 self.CurrentFrame.ppcData[self.iSaveCounter] = data
                 self.iSaveCounter += 1
@@ -333,11 +369,10 @@ class MessageParser:
                 self.reset_new_data_frame()
 
 
-
 # -------------------------------------------------------------------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
 def make_eitframes_hex(FrameList):
-    #todo, not working
+    # todo, not working
     result = []
     for f in FrameList:
         result.append(hex(f.ppcData))
@@ -380,7 +415,7 @@ def get_data_as_matrix(FrameList):
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
-def save_data_frame(path: str, dataframe: EITFrame, iNPZSaveIndex:int):
+def save_data_frame(path: str, dataframe: EITFrame, iNPZSaveIndex: int):
     """
     Saves a single EIT frame in a npz-file. Based on the EITframe class. Saves it at self.NPZSaveIndex
     Args:
@@ -388,13 +423,15 @@ def save_data_frame(path: str, dataframe: EITFrame, iNPZSaveIndex:int):
         dataframe: EITFrame to be saved
         iNPZSaveIndex: Index of the EIT frame to be saved
     """
-    np.savez(path + "eitsample_{0:06d}.npz".format(iNPZSaveIndex),
-             n_el=dataframe.n_el,
-             excitation_stgs=dataframe.excitation_stgs,
-             frequency_stgs=dataframe.frequency_stgs,
-             timestamp1=dataframe.timestamp1,
-             timestamp2=dataframe.timestamp2,
-             ppcData=dataframe.ppcData)
+    np.savez(
+        path + "eitsample_{0:06d}.npz".format(iNPZSaveIndex),
+        n_el=dataframe.n_el,
+        excitation_stgs=dataframe.excitation_stgs,
+        frequency_stgs=dataframe.frequency_stgs,
+        timestamp1=dataframe.timestamp1,
+        timestamp2=dataframe.timestamp2,
+        ppcData=dataframe.ppcData,
+    )
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -412,11 +449,14 @@ def load_eit_frames(path):
     files = sorted(files)
     for f in files:
         l = np.load(os.path.join(path, f), allow_pickle=True)
-        e = EITFrame(n_el=l['n_el'], excitation_stgs=l['excitation_stgs'],
-                    frequency_stgs=l['frequency_stgs'],
-                    timestamp1=l['timestamp1'],
-                    timestamp2=l['timestamp2'],
-                    ppcData=l['ppcData'])
+        e = EITFrame(
+            n_el=l["n_el"],
+            excitation_stgs=l["excitation_stgs"],
+            frequency_stgs=l["frequency_stgs"],
+            timestamp1=l["timestamp1"],
+            timestamp2=l["timestamp2"],
+            ppcData=l["ppcData"],
+        )
         loaded.append(e)
     return loaded
 
@@ -430,7 +470,7 @@ def load_eit_frames_into_nparray(path):
 
     Returns: np.array(ppcData)
     """
-    loaded= load_eit_frames(path)
+    loaded = load_eit_frames(path)
     l = []
     for frame in loaded:
         l.append(frame.ppcData)

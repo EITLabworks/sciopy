@@ -15,6 +15,7 @@ import sys
 from glob import glob
 from .datatype_conversion import *
 
+
 def available_serial_ports() -> list:
     """
     Lists serial port names.
@@ -66,7 +67,6 @@ def clTbt_dp(val: float) -> list:
     return [int(ele) for ele in struct.pack(">d", val)]
 
 
-
 def reshape_full_message_in_bursts(lst: list, ssms: EitMeasurementSetup) -> np.ndarray:
     """
     Takes the full message buffer and splits this message depeding on the measurement configuration into the
@@ -106,9 +106,8 @@ def reshape_full_message_in_bursts(lst: list, ssms: EitMeasurementSetup) -> np.n
     # split in burst count messages
     split_length = lst.shape[0] // ssms.burst_count
     for split in range(ssms.burst_count):
-        split_list.append(lst[split * split_length: (split + 1) * split_length])
+        split_list.append(lst[split * split_length : (split + 1) * split_length])
     return np.array(split_list)
-
 
 
 def parse_single_frame(lst_ele: np.ndarray) -> SingleFrame:
@@ -130,8 +129,8 @@ def parse_single_frame(lst_ele: np.ndarray) -> SingleFrame:
     for i in range(11, 135, 8):
         enum += 1
         channels[f"ch_{enum}"] = complex(
-            bytesarray_to_float(lst_ele[i: i + 4]),
-            bytesarray_to_float(lst_ele[i + 4: i + 8]),
+            bytesarray_to_float(lst_ele[i : i + 4]),
+            bytesarray_to_float(lst_ele[i + 4 : i + 8]),
         )
 
     excitation_stgs = np.array([single_hex_to_int(ele) for ele in lst_ele[3:5]])
@@ -149,7 +148,7 @@ def parse_single_frame(lst_ele: np.ndarray) -> SingleFrame:
 
 
 def split_bursts_in_frames(
-        split_list: np.ndarray, burst_count: int, channel_group: list
+    split_list: np.ndarray, burst_count: int, channel_group: list
 ) -> np.ndarray:
     """
     Takes the splitted list from `reshape_full_message_in_bursts()` and parses the single frames.

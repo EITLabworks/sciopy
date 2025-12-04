@@ -29,8 +29,12 @@ msg_dict = {
 }
 
 from .sciopy_dataclasses import EitMeasurementSetup
-from sciopydev.sciopy.usb_message_parser import (MessageParser, make_eitframes_hex, get_data_as_matrix,
-                                                 make_results_folder)
+from sciopydev.sciopy.usb_message_parser import (
+    MessageParser,
+    make_eitframes_hex,
+    get_data_as_matrix,
+    make_results_folder,
+)
 
 
 class EIT_16_32_64_128:
@@ -152,7 +156,6 @@ class EIT_16_32_64_128:
         """
         self.device.close()
 
-
     def send_message(self, message):
         """
         Wrapper function to send a byte array to the device. Communication method is based on the defined serial
@@ -165,7 +168,6 @@ class EIT_16_32_64_128:
             self.device.write_data(message)
         elif self.serial_protocol == "FS":
             self.device.write(message)
-
 
     def read_message(self):
         """
@@ -253,7 +255,9 @@ class EIT_16_32_64_128:
         """
         self.cMessageParser.bPrintMessages = self.print_msg
         self.send_message(command)
-        self.cMessageParser.read_usb_till_timeout(bSaveData=False, bDeleteDataFrame=True)
+        self.cMessageParser.read_usb_till_timeout(
+            bSaveData=False, bDeleteDataFrame=True
+        )
 
     # --- sciospec device commands
 
@@ -482,8 +486,9 @@ class EIT_16_32_64_128:
         self.write_command_string(bytearray([0xB0, 0x01, 0x01, 0xB0]))
         self.print_msg = False
 
-
-    def update_measurement_mode(self, meamode: str = "skip4", boundary: str = "external"):
+    def update_measurement_mode(
+        self, meamode: str = "skip4", boundary: str = "external"
+    ):
         """
         Updates the measurement modes out of the options "singleended", "skip0", "skip2" or "skip4"
 
@@ -492,12 +497,19 @@ class EIT_16_32_64_128:
             boundary (str): Return if the boundary for skip patterns is internal of a channel group or external for all
                 optional channels
         """
-        meamodeoptions = {"singleended": 0x01, "skip0": 0x02, "skip2": 0x03, "skip4": 0x04}
+        meamodeoptions = {
+            "singleended": 0x01,
+            "skip0": 0x02,
+            "skip2": 0x03,
+            "skip4": 0x04,
+        }
         self.print_msg = True
         try:
             cmd = meamodeoptions[meamode]
         except:
-            print("Option for measurement mode is unknown. Measurement mode ist set to single-ended.")
+            print(
+                "Option for measurement mode is unknown. Measurement mode ist set to single-ended."
+            )
             cmd = 0x01
         if boundary == "external":
             bnd = 0x02
@@ -505,7 +517,7 @@ class EIT_16_32_64_128:
             bnd = 0x01
         self.write_command_string(bytearray([0xB0, 0x03, 0x08, cmd, bnd, 0xB0]))
         self.print_msg = False
-        #todo read out ACK messages
+        # todo read out ACK messages
 
     def GetMeasurementSetup(self, setup_of: str):
         """
@@ -542,7 +554,7 @@ class EIT_16_32_64_128:
         print("TBD: Translation")
         self.print_msg = False
 
-    #todo
+    # todo
     def StartStopMeasurementFast(self, return_as="pot_mat"):
         """
         Starts and stops a measurement process using the configured serial protocol (HS or FS).
@@ -582,9 +594,15 @@ class EIT_16_32_64_128:
         elif return_as == "pot_mat":
             return self.get_data_as_matrix()
 
-
-    def StartStopMeasurementNew(self, timeout:int=0, return_as="pot_mat", bSaveData:bool=False, bDeleteData:bool=False,
-                                sSavepath:str="C/", bResultsFolder=True):
+    def StartStopMeasurementNew(
+        self,
+        timeout: int = 0,
+        return_as="pot_mat",
+        bSaveData: bool = False,
+        bDeleteData: bool = False,
+        sSavepath: str = "C/",
+        bResultsFolder=True,
+    ):
         """
         Starts and stops a measurement process using the configured serial protocol (HS or FS).
         Sends appropriate commands to the device to initiate and terminate measurement.
@@ -611,24 +629,40 @@ class EIT_16_32_64_128:
 
         # Start measurement
         self.cMessageParser.clear_out_data()
-        sCurrentPath= make_results_folder(bResultsFolder, bSaveData, sSavepath) # No new path is created  if bResultsFolder=False
-                                    
+        sCurrentPath = make_results_folder(
+            bResultsFolder, bSaveData, sSavepath
+        )  # No new path is created  if bResultsFolder=False
+
         self.send_message(bytearray([0xB4, 0x01, 0x01, 0xB4]))
         self.cMessageParser.bPrintMessages = False
         if timeout != 0:
-            self.cMessageParser.read_usb_for_seconds(timeout, bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,
-                                                            sSavePath=sCurrentPath,bResultsFolder=False )
+            self.cMessageParser.read_usb_for_seconds(
+                timeout,
+                bSaveData=bSaveData,
+                bDeleteDataFrame=bDeleteData,
+                sSavePath=sCurrentPath,
+                bResultsFolder=False,
+            )
         else:
-            if self.setup.burst_count ==0:
+            if self.setup.burst_count == 0:
                 print("Burst count for this setup needs to be >=1")
                 return
-            self.cMessageParser.read_usb_till_timeout(bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,sSavePath=sSavepath, bResultsFolder=False)
+            self.cMessageParser.read_usb_till_timeout(
+                bSaveData=bSaveData,
+                bDeleteDataFrame=bDeleteData,
+                sSavePath=sSavepath,
+                bResultsFolder=False,
+            )
 
         # Stop measurement
         self.send_message(bytearray([0xB4, 0x01, 0x00, 0xB4]))
         # All data is returned if wanted
-        data = self.cMessageParser.read_usb_till_timeout(bSaveData=bSaveData, bDeleteDataFrame=bDeleteData,
-                                                          sSavePath=sCurrentPath, bResultsFolder=False)
+        data = self.cMessageParser.read_usb_till_timeout(
+            bSaveData=bSaveData,
+            bDeleteDataFrame=bDeleteData,
+            sSavePath=sCurrentPath,
+            bResultsFolder=False,
+        )
 
         if bDeleteData:
             return
@@ -638,8 +672,6 @@ class EIT_16_32_64_128:
             return get_data_as_matrix(data)
         elif return_as == "eitframe":
             return data
-
-
 
     def get_data_as_matrix(self):
         """
