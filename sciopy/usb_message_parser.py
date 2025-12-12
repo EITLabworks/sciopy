@@ -17,6 +17,7 @@ from pandas.core.interchange import dataframe
 import struct
 from .sciopy_dataclasses import EitMeasurementSetup, EITFrame
 from .com_util import bytesarray_to_float, byteintarray_to_float, two_byte_to_int
+from datatime import datetime
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -147,6 +148,7 @@ class MessageParser:
             # todo fill in setup freq settings
             timestamp1=0,
             timestamp2=0,
+            timestamp_pc=0,
             ppcData=np.zeros(
                 self.iMaxChannelGroups * 16 * self.iNumExcitationSettings, dtype=complex
             ),
@@ -347,6 +349,7 @@ class MessageParser:
             # TIMESTAMP
             if self.iSaveCounter == 0:
                 self.CurrentFrame.timestamp1 = message[7:11]
+                self.CurrentFrame.timestamp_pc = datetime.now().timestamp()
 
             # Data Handling
             for i in range(11, 135, 8):
@@ -430,6 +433,7 @@ def save_data_frame(path: str, dataframe: EITFrame, iNPZSaveIndex: int):
         frequency_stgs=dataframe.frequency_stgs,
         timestamp1=dataframe.timestamp1,
         timestamp2=dataframe.timestamp2,
+        timestamp_pc = dataframe.timestamp_pc,
         ppcData=dataframe.ppcData,
     )
 
@@ -455,6 +459,7 @@ def load_eit_frames(path):
             frequency_stgs=l["frequency_stgs"],
             timestamp1=l["timestamp1"],
             timestamp2=l["timestamp2"],
+            timestamp_pc=l["timestamp_pc"],
             ppcData=l["ppcData"],
         )
         loaded.append(e)

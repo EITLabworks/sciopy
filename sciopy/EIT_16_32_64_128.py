@@ -418,8 +418,9 @@ class EIT_16_32_64_128:
         elif setup.gain == 1_000:
             self.write_command_string(bytearray([0xB0, 0x03, 0x09, 0x01, 0x03, 0xB0]))
 
-        # Single ended mode:
-        self.write_command_string(bytearray([0xB0, 0x03, 0x08, 0x01, 0x01, 0xB0]))
+        # Single ended mode as standard setup, if else configured, skip patterns are possible:
+        self.update_measurement_mode(setup.mea_mode, boundary=setup.mea_mode_boundary)
+        #self.write_command_string(bytearray([0xB0, 0x03, 0x08, 0x01, 0x01, 0xB0]))
 
         # Excitation switch type:
         self.write_command_string(bytearray([0xB0, 0x02, 0x0C, 0x01, 0xB0]))
@@ -487,7 +488,7 @@ class EIT_16_32_64_128:
         self.print_msg = False
 
     def update_measurement_mode(
-        self, meamode: str = "skip4", boundary: str = "external"
+        self, meamode: str = "singleended", boundary: str = "internal"
     ):
         """
         Updates the measurement modes out of the options "singleended", "skip0", "skip2" or "skip4"

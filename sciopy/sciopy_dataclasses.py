@@ -30,7 +30,7 @@ class EitMeasurementSetup:
     gain: int
     adc_range: int
     mea_mode: str = "singleended"
-    mea_mode_boundary: str = "external"
+    mea_mode_boundary: str = "internal"
     # TBD: lin/log/sweep
 
 
@@ -228,6 +228,8 @@ class EITFrame:
     frequency_stgs : List[str] # todo
     timestamp1 : int Timestamp of the very first measured channel group in this frame, milli seconds?
     timestamp2 : int Timestamp of the very last measured channel group in this frame, milli seconds?
+    timestamp_pc : int Timestamp of the receiving computer for further data synchronisation from datetime.now().
+                       timestamp()
     ppcData : np.array [[Complex measured data]]
               for e in used excitations stages,
                  for f in used frequency stages:
@@ -239,4 +241,5 @@ class EITFrame:
     frequency_stgs: npt.NDArray[int]  # List of Frequency-Sweep Settings,
     timestamp1: int  # [ms]
     timestamp2: int
+    timestamp_pc: int
     ppcData: npt.NDArray[complex]  # Channels 1-(64) all channel groups combined
