@@ -17,7 +17,7 @@ from pandas.core.interchange import dataframe
 import struct
 from .sciopy_dataclasses import EitMeasurementSetup, EITFrame
 from .com_util import bytesarray_to_float, byteintarray_to_float, two_byte_to_int
-from datatime import datetime
+from datetime import datetime
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #

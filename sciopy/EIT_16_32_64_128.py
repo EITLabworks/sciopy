@@ -595,14 +595,14 @@ class EIT_16_32_64_128:
         elif return_as == "pot_mat":
             return self.get_data_as_matrix()
 
-    def StartStopMeasurementNew(
+    def StartStopMeasurement(
         self,
         timeout: int = 0,
         return_as="pot_mat",
         bSaveData: bool = False,
         bDeleteData: bool = False,
-        sSavepath: str = "C/",
-        bResultsFolder=True,
+        sSavePath: str = "C/",
+        bResultsFolder=False,
     ):
         """
         Starts and stops a measurement process using the configured serial protocol (HS or FS).
@@ -631,7 +631,7 @@ class EIT_16_32_64_128:
         # Start measurement
         self.cMessageParser.clear_out_data()
         sCurrentPath = make_results_folder(
-            bResultsFolder, bSaveData, sSavepath
+            bResultsFolder, bSaveData, sSavePath
         )  # No new path is created  if bResultsFolder=False
 
         self.send_message(bytearray([0xB4, 0x01, 0x01, 0xB4]))
@@ -641,8 +641,7 @@ class EIT_16_32_64_128:
                 timeout,
                 bSaveData=bSaveData,
                 bDeleteDataFrame=bDeleteData,
-                sSavePath=sCurrentPath,
-                bResultsFolder=False,
+                sSavePath=sCurrentPath
             )
         else:
             if self.setup.burst_count == 0:
@@ -651,8 +650,7 @@ class EIT_16_32_64_128:
             self.cMessageParser.read_usb_till_timeout(
                 bSaveData=bSaveData,
                 bDeleteDataFrame=bDeleteData,
-                sSavePath=sSavepath,
-                bResultsFolder=False,
+                sSavePath=sCurrentPath
             )
 
         # Stop measurement
@@ -662,7 +660,6 @@ class EIT_16_32_64_128:
             bSaveData=bSaveData,
             bDeleteDataFrame=bDeleteData,
             sSavePath=sCurrentPath,
-            bResultsFolder=False,
         )
 
         if bDeleteData:
