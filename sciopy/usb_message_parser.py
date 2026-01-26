@@ -433,7 +433,7 @@ def save_data_frame(path: str, dataframe: EITFrame, iNPZSaveIndex: int):
         frequency_stgs=dataframe.frequency_stgs,
         timestamp1=dataframe.timestamp1,
         timestamp2=dataframe.timestamp2,
-        timestamp_pc = dataframe.timestamp_pc,
+        timestamp_pc=dataframe.timestamp_pc,
         ppcData=dataframe.ppcData,
     )
 

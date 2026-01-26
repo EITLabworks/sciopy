@@ -420,7 +420,7 @@ class EIT_16_32_64_128:
 
         # Single ended mode as standard setup, if else configured, skip patterns are possible:
         self.update_measurement_mode(setup.mea_mode, boundary=setup.mea_mode_boundary)
-        #self.write_command_string(bytearray([0xB0, 0x03, 0x08, 0x01, 0x01, 0xB0]))
+        # self.write_command_string(bytearray([0xB0, 0x03, 0x08, 0x01, 0x01, 0xB0]))
 
         # Excitation switch type:
         self.write_command_string(bytearray([0xB0, 0x02, 0x0C, 0x01, 0xB0]))
@@ -641,7 +641,7 @@ class EIT_16_32_64_128:
                 timeout,
                 bSaveData=bSaveData,
                 bDeleteDataFrame=bDeleteData,
-                sSavePath=sCurrentPath
+                sSavePath=sCurrentPath,
             )
         else:
             if self.setup.burst_count == 0:
@@ -650,7 +650,7 @@ class EIT_16_32_64_128:
             self.cMessageParser.read_usb_till_timeout(
                 bSaveData=bSaveData,
                 bDeleteDataFrame=bDeleteData,
-                sSavePath=sCurrentPath
+                sSavePath=sCurrentPath,
             )
 
         # Stop measurement
