@@ -555,7 +555,6 @@ class EIT_16_32_64_128:
         print("TBD: Translation")
         self.print_msg = False
 
-    # todo
     def StartStopMeasurementFast(self, return_as="pot_mat"):
         """
         Starts and stops a measurement process using the configured serial protocol (HS or FS).
@@ -622,7 +621,8 @@ class EIT_16_32_64_128:
             bSaveData (bool): Specifies if the measured data is saved in NPZ format
             bDeleteData (bool): Specifies if the measured data is deleted out of memory after each EITframe, with
                 bSaveData=True, measured data is saved and then removed from RAM
-            sSavepath (str): Specifies the sPath where the measured data is saved.
+            sSavePath (str): Specifies the sPath where the measured data is saved.
+            bResultsFolder (bool): Specifies if additionally a folder in sSavePath is created to store the data in
 
         Returns:
             list or matrix: The measurement data in the format specified by `return_as`.

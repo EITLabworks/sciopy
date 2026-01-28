@@ -6,6 +6,7 @@ from .com_util import (
 
 from .EIT_16_32_64_128 import EIT_16_32_64_128, EitMeasurementSetup
 from .ISX_3 import ISX_3, EisMeasurementSetup
+from .usb_message_parser import make_results_folder
 
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "EitMeasurementSetup",
     "ISX_3",
     "EisMeasurementSetup",
+    "make_results_folder",
 ]
