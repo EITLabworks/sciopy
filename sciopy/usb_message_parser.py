@@ -160,6 +160,7 @@ class MessageParser:
         Deletes saved data frames
         """
         self.ppcData = []
+        self.reset_new_data_frame()
 
     # ---------------------------------------------------------------------------------------------------------------- #
     def init_parser(self):
@@ -212,6 +213,7 @@ class MessageParser:
         bSaveData: bool = False,
         bDeleteDataFrame: bool = False,
         sSavePath: str = "C/",
+        bStartReset: bool = True,
     ):
         """
         Reads out the USB connection for fTime seconds, regardless of whether data is received. Data bytes are parsed,
@@ -225,6 +227,8 @@ class MessageParser:
         Returns:
             List of received data eit frames, no Status messages are saved
         """
+        if bStartReset:
+            self.reset_new_data_frame()
         iMessageCount = 0
         bMessageStarted = False
         timeout_count = 0
@@ -256,7 +260,7 @@ class MessageParser:
 
     # ---------------------------------------------------------------------------------------------------------------- #
     def read_usb_till_timeout(
-        self, bSaveData=False, bDeleteDataFrame=False, sSavePath="C/"
+        self, bSaveData:bool =False, bDeleteDataFrame:bool =False, sSavePath:str="C/", bStartReset: bool=True
     ):
         """
         Reads out the USB connection until the connections times out, so for messages received + timeout. Data bytes are parsed,
@@ -269,6 +273,8 @@ class MessageParser:
         Returns:
             List of received data eit frames, no Status messages are saved
         """
+        if bStartReset:
+            self.reset_new_data_frame()
         iMessageCount = 0
         timeout_count = 0
         while True:
@@ -335,7 +341,7 @@ class MessageParser:
         if (
             message[2] <= self.iMaxChannelGroups
         ):  # Necessary, since  all four channel groups are send
-            if message[2] == 1 and freq_group == 1:
+            if message[2] == 1 and freq_group == 1: # todo or gleich 0, weil er nicht mitschreibt
                 self.CurrentFrame.excitation_stgs[self.iInjIndex] = [
                     message[3],
                     message[4],
@@ -348,7 +354,7 @@ class MessageParser:
 
             # TIMESTAMP
             if self.iSaveCounter == 0:
-                self.CurrentFrame.timestamp1 = message[7:11]
+                self.CurrentFrame.timestamp1 = message[7:11] #todo byteinarray_to_flaost
                 self.CurrentFrame.timestamp_pc = datetime.now().timestamp()
 
             # Data Handling

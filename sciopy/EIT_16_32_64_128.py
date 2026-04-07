@@ -660,8 +660,10 @@ class EIT_16_32_64_128:
             bSaveData=bSaveData,
             bDeleteDataFrame=bDeleteData,
             sSavePath=sCurrentPath,
+            bStartReset=False
         )
 
+        self.cMessageParser.clear_out_data()
         if bDeleteData:
             return
         if return_as == "hex":
