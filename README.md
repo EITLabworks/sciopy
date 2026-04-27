@@ -8,6 +8,8 @@ This package offers the serial interface for communication with an EIT device fr
 
 ### Preliminary Installation for Windows
 
+__If you run this you won't be able to connect the Instrument to the sciospec default program.__
+
 You need libusb, to get it, install Zadig (https://zadig.akeo.ie/). 
 Then Option/list all devices. Having the Sciospec instrument connected select the Right entry and install libusb-win32 (v1.4.0.0).  
 
