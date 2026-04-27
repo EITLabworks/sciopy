@@ -1,0 +1,13 @@
+name: sciopy # This will become the name of your environment
+dependencies: # The list of packages to include in your environment
+    - python=3.10 # You can specify versions
+    - matplotlib=3.10.8
+    - numpy=2.2.5
+    - Pandas=2.3.3
+    - pyserial=3.5
+    - setuptools=82.0.1
+    - tqdm=4.67.3
+    - pip=26.0.1 # Install pip in your Environment
+    - pip: # Include pip dependencies last
+        - pyeit
+        - pyftdi    
