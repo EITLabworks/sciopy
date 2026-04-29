@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="sciopy",
-    version="0.8.2.3",
+    version="0.9.0",
     packages=find_packages(),
     author="Jacob P. Thönes",
     author_email="jacob.thoenes@uni-rostock.de",
