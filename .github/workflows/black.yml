@@ -11,4 +11,4 @@ jobs:
         with:
           options: "--check --diff"
           src: "./sciopy"
-          version: "24.10.0"
+          version: "26.1.0"

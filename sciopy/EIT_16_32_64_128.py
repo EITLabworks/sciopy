@@ -158,11 +158,19 @@ class EIT_16_32_64_128:
 
     def send_message(self, message):
         """
-        Wrapper function to send a byte array to the device. Communication method is based on the defined serial
-        protocol.
+        Reads data from a USB device, processes received messages, and returns the data in the specified format.
 
-        Args:
-            message (bytearray): A byte array to be sent to the device.
+        The method continuously reads from the device until no more data is received, then processes the received bytes.
+        It converts the received data to hexadecimal format and attempts to identify a specific message index.
+        Depending on the value of `self.ret_hex_int`, it returns the data as hexadecimal, integer, or both.
+
+        Prints diagnostic messages if `self.print_msg` is True.
+
+        Returns:
+            list[str]: List of received data in hexadecimal format if `self.ret_hex_int == "hex"`.
+            list[int]: List of received data as integers if `self.ret_hex_int == "int"`.
+            tuple: Both integer and hexadecimal lists if `self.ret_hex_int == "both"`.
+            None: If `self.ret_hex_int` is None.
         """
         if self.serial_protocol == "HS":
             self.device.write_data(message)
@@ -177,27 +185,20 @@ class EIT_16_32_64_128:
         Return:
             A single byte read from the device.
         """
-        if self.serial_protocol == "HS":
-            return self.device.read_data_bytes(size=1024, attempt=150)
-        elif self.serial_protocol == "FS":
-            return self.device.read()
+        Reads data from a USB high-speed device, processes received messages, and returns the data in various formats.
 
-    def SystemMessageCallback(self):
-        """
-        Handles system messages based on the selected serial protocol.
-        Reads data from a USB device, processes received messages, and returns the data in the specified format.
-
-        The method continuously reads from the device until no more data is received, then processes the received bytes.
-        It converts the received data to hexadecimal format and attempts to identify a specific message index.
-        Depending on the value of `self.ret_hex_int`, it returns the data as hexadecimal, integer, or both.
-
-        Prints diagnostic messages if `self.print_msg` is True.
+        The method continuously reads data from the device until no more data is received. It converts the received bytes to hexadecimal format,
+        searches for a specific message index, and prints corresponding messages if enabled. The returned data format depends on the value of
+        `self.ret_hex_int` ("hex", "int", "both", or None).
 
         Returns:
             list[str]: List of received data in hexadecimal format if `self.ret_hex_int == "hex"`.
             list[int]: List of received data as integers if `self.ret_hex_int == "int"`.
-            tuple: Both integer and hexadecimal lists if `self.ret_hex_int == "both"`.
+            tuple[list[int], list[str]]: Both integer and hexadecimal lists if `self.ret_hex_int == "both"`.
             None: If `self.ret_hex_int` is None.
+
+        Raises:
+            BaseException: If message index is not found in the received data.
         """
         timeout_count = 0
         received = []
@@ -238,6 +239,23 @@ class EIT_16_32_64_128:
             return received
         elif self.ret_hex_int == "both":
             return received, received_hex
+
+    def SystemMessageCallback(self):
+        """
+        Handles system messages based on the selected serial protocol.
+
+        Depending on the value of `self.serial_protocol`, this method delegates
+        the handling of system messages to the appropriate callback:
+            - If `self.serial_protocol` is "HS", calls `SystemMessageCallback_usb_hs()`.
+            - If `self.serial_protocol` is "FS", calls `SystemMessageCallback_usb_fs()`.
+
+        Raises:
+            AttributeError: If the required callback methods are not defined.
+        """
+        if self.serial_protocol == "HS":
+            self.SystemMessageCallback_usb_hs()
+        elif self.serial_protocol == "FS":
+            self.SystemMessageCallback_usb_fs()
 
     def write_command_string(self, command):
         """
@@ -491,37 +509,6 @@ class EIT_16_32_64_128:
         self, meamode: str = "singleended", boundary: str = "internal"
     ):
         """
-        Updates the measurement modes out of the options "singleended", "skip0", "skip2" or "skip4"
-
-        Args:
-            meamode (str): Measurement mode  "singleended", "skip0", "skip2" or "skip4"
-            boundary (str): Return if the boundary for skip patterns is internal of a channel group or external for all
-                optional channels
-        """
-        meamodeoptions = {
-            "singleended": 0x01,
-            "skip0": 0x02,
-            "skip2": 0x03,
-            "skip4": 0x04,
-        }
-        self.print_msg = True
-        try:
-            cmd = meamodeoptions[meamode]
-        except:
-            print(
-                "Option for measurement mode is unknown. Measurement mode ist set to single-ended."
-            )
-            cmd = 0x01
-        if boundary == "external":
-            bnd = 0x02
-        else:
-            bnd = 0x01
-        self.write_command_string(bytearray([0xB0, 0x03, 0x08, cmd, bnd, 0xB0]))
-        self.print_msg = False
-        # todo read out ACK messages
-
-    def GetMeasurementSetup(self, setup_of: str):
-        """
         Retrieves and configures the measurement setup for the device based on the specified setup option.
 
         Parameters:
@@ -555,7 +542,7 @@ class EIT_16_32_64_128:
         print("TBD: Translation")
         self.print_msg = False
 
-    def StartStopMeasurementFast(self, return_as="pot_mat"):
+    def StartStopMeasurement(self, return_as="pot_mat"):
         """
         Starts and stops a measurement process using the configured serial protocol (HS or FS).
         Sends appropriate commands to the device to initiate and terminate measurement.
@@ -571,12 +558,21 @@ class EIT_16_32_64_128:
         Returns:
             list or matrix: The measurement data in the format specified by `return_as`.
         """
-        if self.setup.burst_count == 0:
-            print("Burst count for this setup needs to be >=1")
-            return
-        self.send_message(bytearray([0xB4, 0x01, 0x01, 0xB4]))
-        self.ret_hex_int = "hex"
-        self.print_msg = False
+        if self.serial_protocol == "HS":
+            self.device.write_data(bytearray([0xB4, 0x01, 0x01, 0xB4]))
+            self.ret_hex_int = "hex"
+            self.print_msg = False
+
+            data = self.SystemMessageCallback_usb_hs()
+
+            self.device.write_data(bytearray([0xB4, 0x01, 0x00, 0xB4]))
+            self.ret_hex_int = None
+            self.SystemMessageCallback()
+
+        elif self.serial_protocol == "FS":
+            self.device.write(bytearray([0xB4, 0x01, 0x01, 0xB4]))
+            self.ret_hex_int = "hex"
+            self.print_msg = False
 
         data = self.SystemMessageCallback()
 
