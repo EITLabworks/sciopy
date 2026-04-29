@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from typing import List, Tuple, Union
+import numpy.typing as npt
 
 
 @dataclass
@@ -28,6 +29,8 @@ class EitMeasurementSetup:
     inj_skip: Union[int, list]
     gain: int
     adc_range: int
+    mea_mode: str = "singleended"
+    mea_mode_boundary: str = "internal"
     # TBD: lin/log/sweep
 
 
@@ -209,3 +212,34 @@ class PreperationConfig:
     lpath: str
     spath: str
     n_samples: int
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+@dataclass
+class EITFrame:
+    """
+    This class is for parsing the whole EIT excitation stages (and frequency stages).
+    Defined by Sciospec:"EIT -16,32,64,128", Chapter 5.4.1
+
+    Parameters
+    ----------
+    n_el = Number of used electrodes
+    excitation_stgs : np.array [[int1, int2]] , Features the [ESout, ESin] injection electrodes
+    frequency_stgs : List[str] # todo
+    timestamp1 : int Timestamp of the very first measured channel group in this frame, milli seconds?
+    timestamp2 : int Timestamp of the very last measured channel group in this frame, milli seconds?
+    timestamp_pc : int Timestamp of the receiving computer for further data synchronisation from datetime.now().
+                       timestamp()
+    ppcData : np.array [[Complex measured data]]
+              for e in used excitations stages,
+                 for f in used frequency stages:
+                    for c in all used channels: -> insert complex value
+    """
+
+    n_el: int  # Number of used electrodes
+    excitation_stgs: npt.NDArray[int]  # Num Excitation Settings X 2
+    frequency_stgs: npt.NDArray[int]  # List of Frequency-Sweep Settings,
+    timestamp1: int  # [ms]
+    timestamp2: int
+    timestamp_pc: int
+    ppcData: npt.NDArray[complex]  # Channels 1-(64) all channel groups combined

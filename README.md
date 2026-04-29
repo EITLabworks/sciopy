@@ -9,3 +9,7 @@ This package offers the serial interface for communication with an EIT device fr
 If you have any ideas or other suggestions, please don't hesitate to contact me.
 
 Email: jacob.thoenes@uni-rostock.de
+
+___
+
+- FTDI Driver installation: https://www.ftdichip.com/old2020/Drivers/D2XX.htm

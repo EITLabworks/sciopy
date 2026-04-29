@@ -1,6 +1,8 @@
 """Module for interfacing with the Sciospec ISX-3 EIT device via serial communication"""
 
 try:
+    from pyftdi.ftdi import Ftdi
+    from pyftdi.usbtools import UsbTools
     import serial
 except ImportError:
     print("Could not import module: serial")
@@ -8,7 +10,6 @@ except ImportError:
 from dataclasses import dataclass
 
 from .sciopy_dataclasses import EisMeasurementSetup
-
 
 msg_dict = {
     "0x01": "No message inside the message buffer",

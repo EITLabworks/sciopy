@@ -5,7 +5,6 @@ import numpy as np
 import pickle
 from .sciopy_dataclasses import SingleEitFrame
 
-
 header_keys = [
     "number_of_header",
     "file_version_number",

@@ -13,6 +13,7 @@ import numpy as np
 import struct
 import sys
 from glob import glob
+from .datatype_conversion import *
 
 
 def available_serial_ports() -> list:
@@ -66,28 +67,6 @@ def clTbt_dp(val: float) -> list:
     return [int(ele) for ele in struct.pack(">d", val)]
 
 
-def del_hex_in_list(lst: list) -> np.ndarray:
-    """
-    Delete the hexadecimal 0x python notation.
-
-    Parameters
-    ----------
-    lst : list
-        list of hexadecimals
-
-    Returns
-    -------
-    np.ndarray
-        cleared message
-    """
-    return np.array(
-        [
-            "0" + ele.replace("0x", "") if len(ele) == 1 else ele.replace("0x", "")
-            for ele in lst
-        ]
-    )
-
-
 def reshape_full_message_in_bursts(lst: list, ssms: EitMeasurementSetup) -> np.ndarray:
     """
     Takes the full message buffer and splits this message depeding on the measurement configuration into the
@@ -129,82 +108,6 @@ def reshape_full_message_in_bursts(lst: list, ssms: EitMeasurementSetup) -> np.n
     for split in range(ssms.burst_count):
         split_list.append(lst[split * split_length : (split + 1) * split_length])
     return np.array(split_list)
-
-
-def single_hex_to_int(str_num: str) -> int:
-    """
-    Delete the hexadecimal 0x python notation.
-
-    Parameters
-    ----------
-    str_num : str
-        single hexadecimal string
-
-    Returns
-    -------
-    int
-        integer number
-    """
-    if len(str_num) == 1:
-        str_num = f"0x0{str_num}"
-    else:
-        str_num = f"0x{str_num}"
-    return int(str_num, 16)
-
-
-def bytesarray_to_float(bytes_array: np.ndarray) -> float:
-    """
-    Converts a bytes array to a float number.
-
-    Parameters
-    ----------
-    bytes_array : np.ndarray
-        array of bytes
-
-    Returns
-    -------
-    float
-        double precision float
-    """
-    bytes_array = [int(b, 16) for b in bytes_array]
-    bytes_array = bytes(bytes_array)
-    return struct.unpack("!f", bytes(bytes_array))[0]
-
-
-def bytesarray_to_byteslist(bytes_array: np.ndarray) -> list:
-    """
-    Converts a bytes array to a list of bytes.
-
-    Parameters
-    ----------
-    bytes_array : np.ndarray
-        array of bytes
-
-    Returns
-    -------
-    list
-        list of bytes
-    """
-    bytes_array = [int(b, 16) for b in bytes_array]
-    return bytes(bytes_array)
-
-
-def bytesarray_to_int(bytes_array: np.ndarray) -> int:
-    """
-    Converts a bytes array to int number.
-
-    Parameters
-    ----------
-    bytes_array : np.ndarray
-        array of bytes
-
-    Returns
-    -------
-    int
-        integer number
-    """
-    bytes_array = bytesarray_to_byteslist(bytes_array)
-    return int.from_bytes(bytes_array, "big")
 
 
 def parse_single_frame(lst_ele: np.ndarray) -> SingleFrame:
@@ -256,6 +159,7 @@ def split_bursts_in_frames(
         channel depending burst frames
     """
     msg_len = 140  # Constant
+    iC = 0
     frame = []  # Channel group depending frame
     burst_frame = []  # single burst count frame with channel depending frame
     subframe_length = split_list.shape[1] // msg_len
@@ -266,6 +170,10 @@ def split_bursts_in_frames(
             # Select the right channel group data
             if parsed_sgl_frame.channel_group in channel_group:
                 frame.append(parsed_sgl_frame)
+
+            else:
+                iC += 1
         burst_frame.append(frame)
         frame = []  # Reset channel depending single burst frame
+    print("UNUSED CG " + str(iC))
     return np.array(burst_frame)
