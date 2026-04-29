@@ -184,7 +184,7 @@ class EIT_16_32_64_128:
 
         Return:
             A single byte read from the device.
-        """
+
         Reads data from a USB high-speed device, processes received messages, and returns the data in various formats.
 
         The method continuously reads data from the device until no more data is received. It converts the received bytes to hexadecimal format,
