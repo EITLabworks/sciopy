@@ -660,7 +660,7 @@ class EIT_16_32_64_128:
             bSaveData=bSaveData,
             bDeleteDataFrame=bDeleteData,
             sSavePath=sCurrentPath,
-            bStartReset=False
+            bStartReset=False,
         )
 
         self.cMessageParser.clear_out_data()

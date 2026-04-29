@@ -11,7 +11,6 @@ from dataclasses import dataclass
 
 from .sciopy_dataclasses import EisMeasurementSetup
 
-
 msg_dict = {
     "0x01": "No message inside the message buffer",
     "0x02": "Timeout: Communication-timeout (less data than expected)",
@@ -62,8 +61,7 @@ class ISX_3:
 
     def info():
         print("ISX-3v2 EIT device specifications")
-        print(
-            """
+        print("""
         Frequency
         range: 100mHz to 10MHz
         resolution: <10mHz @ f<10kHz
@@ -103,8 +101,7 @@ class ISX_3:
 
         [1] Sweep-Delay: Timing delay between two consecutive measurements of complete impedance spectra
         [2] Point-Delay: Timing delay between two consecutive measurements of single frequencies
-        """
-        )
+        """)
 
     def list_usb_devices(self):
         """
