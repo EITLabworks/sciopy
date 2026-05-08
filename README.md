@@ -6,25 +6,45 @@ This package offers the serial interface for communication with an EIT device fr
 
 ## Installation
 
-### Preliminary Installation for Windows
+### Windows: USB Driver Setup
 
-__If you run this you won't be able to connect the Instrument to the sciospec default program.__
+To communicate with the Sciospec instrument over USB on Windows, you must install the `libusb` driver.
 
-You need libusb, to get it, install Zadig (https://zadig.akeo.ie/). 
-Then Option/list all devices. Having the Sciospec instrument connected select the Right entry and install libusb-win32 (v1.4.0.0).  
+> [!WARNING]
+> Installing the `libusb` driver will prevent the Sciospec instrument from working with the official Sciospec software on the selected USB port (`FS` or `HS`).
+>
+> After installation, the Sciospec software may no longer recognize the device on that port.
+>
+> To restore the original behavior, you will need to uninstall the driver manually.  
+> *(This rollback process has not been fully tested.)*
 
+#### Install `libusb` using Zadig
 
-### For all platforms
+1. Download and install Zadig:  
+   https://zadig.akeo.ie/
 
-Clone the project.
+2. Connect the Sciospec instrument to your computer.
 
-Run
+3. Open Zadig and enable:
+	Options → List All Devices 
 
-´´´
+4. Select the correct Sciospec USB device from the list.
+
+5. Install the driver:
+	`libusb-win32 (v1.4.0.0)`
+
+---
+
+### All Platforms
+
+Clone the repository, then create and activate the Conda environment:
+
+```bash
 conda create --file environment.yml
 conda activate sciopy
 pip install -e .
-´´´
+```
+
 
 
 

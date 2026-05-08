@@ -1,8 +1,0 @@
-matplotlib==3.7.2
-numpy==1.25.0
-pandas==2.0.3
-pyeit==1.2.4
-pyftdi==0.55.0
-pyserial==3.5
-setuptools==78.1.1
-tqdm==4.66.3
