@@ -29,7 +29,7 @@ msg_dict = {
 }
 
 from .sciopy_dataclasses import EitMeasurementSetup
-from usb_message_parser import (
+from .usb_message_parser import (
     MessageParser,
     make_eitframes_hex,
     get_data_as_matrix,
