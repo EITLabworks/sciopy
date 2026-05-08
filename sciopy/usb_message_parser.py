@@ -2,24 +2,18 @@
 Project ：sciopy
 Directory: sciopy/sciopy
 File : usb_message_parser.py
-Author ：Patricia Fuchs
+Author ：Patricia Fuchs, edit Jacob Thönes
 Date ：17.11.2025 09:04
 """
 
 import numpy as np
 import time
 
-from dataclasses import dataclass
-from typing import List, Tuple, Union
-import numpy.typing as npt
 import os
-from pandas.core.interchange import dataframe
-import struct
 from .sciopy_dataclasses import EitMeasurementSetup, EITFrame
-from .com_util import bytesarray_to_float, byteintarray_to_float, two_byte_to_int
+from .com_util import byteintarray_to_float, two_byte_to_int
 from datetime import datetime
 
-# -------------------------------------------------------------------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
 msg_dict = {
     "0x01": "No message inside the message buffer",
@@ -71,7 +65,6 @@ def byte_parser():
         piCurrMess = []
 
 
-# -------------------------------------------------------------------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
 class MessageParser:
     """
