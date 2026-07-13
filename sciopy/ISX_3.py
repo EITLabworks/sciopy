@@ -10,7 +10,6 @@ import serial
 
 from .sciopy_dataclasses import EisMeasurementSetup
 
-
 SYSTEM_MESSAGES = {
     0x01: "Frame-Not-Acknowledge: Incorrect syntax",
     0x02: "Timeout: Communication-timeout (less data than expected)",
