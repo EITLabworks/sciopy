@@ -125,7 +125,9 @@ def _choice(value, choices, name):
         try:
             return choices[value.lower()]
         except KeyError as error:
-            raise ValueError(f"Unknown {name} {value!r}; choose from {tuple(choices)}") from error
+            raise ValueError(
+                f"Unknown {name} {value!r}; choose from {tuple(choices)}"
+            ) from error
     if isinstance(value, int) and value in choices.values():
         return value
     raise ValueError(f"Invalid {name}: {value!r}")
@@ -323,7 +325,11 @@ class ISX_3:
         """Decode one validated protocol frame into a typed or dictionary value."""
         tag, payload = frame[0], bytes(frame[2:-1])
         if tag == 0x18:
-            return {"command": tag, "status": payload[0], "message": SYSTEM_MESSAGES.get(payload[0])}
+            return {
+                "command": tag,
+                "status": payload[0],
+                "message": SYSTEM_MESSAGES.get(payload[0]),
+            }
         if tag == 0xB8:
             return self._decode_measurement(payload)
         if tag == 0xB1 and len(payload) >= 4:
@@ -334,7 +340,9 @@ class ISX_3:
                 "voltage_range": payload[3],
             }
         if tag == 0xB3 and len(payload) == 4:
-            return dict(zip(("counter", "reference", "working_sense", "working"), payload))
+            return dict(
+                zip(("counter", "reference", "working_sense", "working"), payload)
+            )
         if tag == 0xB5:
             return self._decode_modules(payload)
         if tag == 0x98:
@@ -349,8 +357,12 @@ class ISX_3:
             developer_length = 2 if tag == 0xD0 else 5
             return {
                 "developer_information": payload[:developer_length].hex(),
-                "revision": int.from_bytes(payload[developer_length : developer_length + 2], "big"),
-                "build": int.from_bytes(payload[developer_length + 2 : developer_length + 4], "big"),
+                "revision": int.from_bytes(
+                    payload[developer_length : developer_length + 2], "big"
+                ),
+                "build": int.from_bytes(
+                    payload[developer_length + 2 : developer_length + 4], "big"
+                ),
             }
         if tag == 0xD1 and len(payload) >= 7:
             return {
@@ -380,7 +392,9 @@ class ISX_3:
         if self.current_range_output:
             current_range, index = payload[index], index + 1
         if len(payload) - index != 8:
-            raise ValueError("Measurement layout does not match configured output options")
+            raise ValueError(
+                "Measurement layout does not match configured output options"
+            )
         real, imaginary = struct.unpack(">ff", payload[index : index + 8])
         return ISXMeasurement(
             frequency_id=int.from_bytes(payload[:2], "big"),
@@ -400,14 +414,18 @@ class ISX_3:
         if payload[0] == 0x09:
             if len(payload) < 4:
                 raise ValueError("Incomplete external module channel count")
-            result["extension_channel_count"] = int.from_bytes(payload[index : index + 2], "big")
+            result["extension_channel_count"] = int.from_bytes(
+                payload[index : index + 2], "big"
+            )
             index += 2
         if index >= len(payload):
             raise ValueError("Missing internal module identifier")
         result["internal_module"] = INTERNAL_MODULES.get(payload[index], payload[index])
         index += 1
         if payload[index - 1] == 0x09 and len(payload) >= index + 2:
-            result["internal_channel_count"] = int.from_bytes(payload[index : index + 2], "big")
+            result["internal_channel_count"] = int.from_bytes(
+                payload[index : index + 2], "big"
+            )
         return result
 
     @staticmethod
@@ -418,7 +436,11 @@ class ISX_3:
         option, data = payload[0], payload[1:]
         if option == 0x03 and len(data) == 8:
             minimum, maximum = struct.unpack(">ff", data)
-            return {"option": "frequency_range", "minimum_hz": minimum, "maximum_hz": maximum}
+            return {
+                "option": "frequency_range",
+                "minimum_hz": minimum,
+                "maximum_hz": maximum,
+            }
         return {"option": option, "value": data[0] if len(data) == 1 else list(data)}
 
     @staticmethod
@@ -430,7 +452,12 @@ class ISX_3:
         if option == 0x01 and len(data) == 2:
             return {"frequency_count": int.from_bytes(data, "big")}
         if option == 0x04 and len(data) % 4 == 0:
-            return {"frequencies_hz": [struct.unpack(">f", data[i : i + 4])[0] for i in range(0, len(data), 4)]}
+            return {
+                "frequencies_hz": [
+                    struct.unpack(">f", data[i : i + 4])[0]
+                    for i in range(0, len(data), 4)
+                ]
+            }
         if option == 0x02 and len(data) >= 12:
             result = {
                 "frequency_hz": struct.unpack(">f", data[0:4])[0],
@@ -443,8 +470,14 @@ class ISX_3:
                 if index + 5 > len(data):
                     raise ValueError("Incomplete extended frequency option")
                 value = int.from_bytes(data[index + 1 : index + 5], "big")
-                names = {0x01: "point_delay_us", 0x02: "phase_sync", 0x03: "excitation_type"}
-                result[names.get(extended_option, f"option_0x{extended_option:02x}")] = value
+                names = {
+                    0x01: "point_delay_us",
+                    0x02: "phase_sync",
+                    0x03: "excitation_type",
+                }
+                result[
+                    names.get(extended_option, f"option_0x{extended_option:02x}")
+                ] = value
                 index += 5
             return result
         if option == 0x33 and len(data) == 4:
@@ -505,10 +538,14 @@ class ISX_3:
 
     def GetOptions(self, option):
         """Read a timestamp, current-range, or available-frequency option."""
-        return self.send_command(0x98, [_choice(option, OPTION_CODES | {"frequency_range": 0x03}, "option")])
+        return self.send_command(
+            0x98, [_choice(option, OPTION_CODES | {"frequency_range": 0x03}, "option")]
+        )
 
     # Frontend and extension-port commands ---------------------------------------
-    def SetFE_Settings(self, measurement_mode, measurement_channel, current_range, voltage_range="1v"):
+    def SetFE_Settings(
+        self, measurement_mode, measurement_channel, current_range, voltage_range="1v"
+    ):
         """Append one frontend configuration to the device stack.
 
         Parameters accept either documented numeric codes or symbolic names
@@ -557,11 +594,25 @@ class ISX_3:
         if phase_sync is not None:
             data.extend([0x02, *_uint_bytes(int(bool(phase_sync)), 4)])
         if excitation_type is not None:
-            data.extend([0x03, *_uint_bytes(_choice(excitation_type, EXCITATION_TYPES, "excitation type"), 4)])
+            data.extend(
+                [
+                    0x03,
+                    *_uint_bytes(
+                        _choice(excitation_type, EXCITATION_TYPES, "excitation type"), 4
+                    ),
+                ]
+            )
         return data
 
     def AddFrequencyPoint(
-        self, frequency, precision, amplitude, *, point_delay=None, phase_sync=None, excitation_type=None
+        self,
+        frequency,
+        precision,
+        amplitude,
+        *,
+        point_delay=None,
+        phase_sync=None,
+        excitation_type=None,
     ):
         """Append one frequency point to the active setup.
 
@@ -581,7 +632,9 @@ class ISX_3:
             Unit and excitation mode used by ``amplitude``.
         """
         data = bytearray([0x02])
-        data.extend(_float_bytes(frequency) + _float_bytes(precision) + _float_bytes(amplitude))
+        data.extend(
+            _float_bytes(frequency) + _float_bytes(precision) + _float_bytes(amplitude)
+        )
         data.extend(self._extended_options(point_delay, phase_sync, excitation_type))
         return self.send_command(0xB6, data)
 
@@ -641,7 +694,9 @@ class ISX_3:
     def SetCompensationLoad(self, value, load_type="resistance"):
         """Set the known compensation load in ohms or farads."""
         types = {"resistance": 0x01, "capacitor": 0x02}
-        return self.send_command(0xB6, [0x16, _choice(load_type, types, "load type"), *_float_bytes(value)])
+        return self.send_command(
+            0xB6, [0x16, _choice(load_type, types, "load type"), *_float_bytes(value)]
+        )
 
     def ResetCompensationData(self):
         """Delete compensation data associated with the active setup."""
@@ -699,12 +754,22 @@ class ISX_3:
         data : iterable of int, optional
             Additional command data, such as a two-byte frequency row.
         """
-        return self.send_command(0xB7, [_choice(option, {
-            "frequency_count": 0x01,
-            "frequency_point": 0x02,
-            "frequency_list": 0x04,
-            "dc_bias": 0x33,
-        }, "setup option"), *data])
+        return self.send_command(
+            0xB7,
+            [
+                _choice(
+                    option,
+                    {
+                        "frequency_count": 0x01,
+                        "frequency_point": 0x02,
+                        "frequency_list": 0x04,
+                        "dc_bias": 0x33,
+                    },
+                    "setup option",
+                ),
+                *data,
+            ],
+        )
 
     def GetFrequencyCount(self):
         """Read the total number of configured frequency points."""
@@ -770,7 +835,9 @@ class ISX_3:
         """
         self.measurements = []
         self.send_message(self.build_frame(0xB8, [0x01, *_uint_bytes(repeat, 2)]))
-        self._pending_command = list(self.build_frame(0xB8, [0x01, *_uint_bytes(repeat, 2)]))
+        self._pending_command = list(
+            self.build_frame(0xB8, [0x01, *_uint_bytes(repeat, 2)])
+        )
         self.SystemMessageCallback(timeout=timeout)
         return list(self.measurements)
 
@@ -823,7 +890,9 @@ class ISX_3:
         if (ip_address is None) == (dhcp is None):
             raise ValueError("provide exactly one of ip_address or dhcp")
         if ip_address is not None:
-            return self.send_command(0xBD, [0x01, *ipaddress.IPv4Address(ip_address).packed])
+            return self.send_command(
+                0xBD, [0x01, *ipaddress.IPv4Address(ip_address).packed]
+            )
         return self.send_command(0xBD, [0x03, int(bool(dhcp))])
 
     def GetEthernetConfiguration(self, option):

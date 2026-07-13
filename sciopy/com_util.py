@@ -10,7 +10,11 @@ import numpy as np
 import struct
 import sys
 from glob import glob
-from .datatype_conversion import bytesarray_to_float, bytesarray_to_int, single_hex_to_int
+from .datatype_conversion import (
+    bytesarray_to_float,
+    bytesarray_to_int,
+    single_hex_to_int,
+)
 
 
 def available_serial_ports() -> list:

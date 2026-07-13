@@ -43,7 +43,13 @@ def test_parser_rejects_mismatched_message_tags():
 
 def test_status_read_does_not_require_measurement_setup():
     device = Mock()
-    device.read.side_effect = [bytes([0x18]), bytes([0x01]), bytes([0x83]), bytes([0x18]), b""]
+    device.read.side_effect = [
+        bytes([0x18]),
+        bytes([0x01]),
+        bytes([0x83]),
+        bytes([0x18]),
+        b"",
+    ]
     parser = MessageParser(device, devicetype="FS")
 
     assert parser.read_usb_till_timeout() == []

@@ -206,7 +206,9 @@ def bytelist_to_int(bytelist):
 
 
 def _hex_array_to_bytes(values, expected_length=None):
-    result = bytes(int(value, 16) if isinstance(value, str) else int(value) for value in values)
+    result = bytes(
+        int(value, 16) if isinstance(value, str) else int(value) for value in values
+    )
     if expected_length is not None and len(result) != expected_length:
         raise ValueError(f"Expected exactly {expected_length} bytes.")
     return result

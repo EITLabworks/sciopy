@@ -79,7 +79,9 @@ class EIT_16_32_64_128:
             Any exceptions raised by the FTDI library during device initialization or configuration.
         """
         if hasattr(self, "serial_protocol"):
-            print(f"Replacing existing {self.serial_protocol} serial connection with HS.")
+            print(
+                f"Replacing existing {self.serial_protocol} serial connection with HS."
+            )
         self.serial_protocol = "HS"
 
         serial = Ftdi().create_from_url(url=url)
@@ -109,7 +111,9 @@ class EIT_16_32_64_128:
             - Prints a confirmation message upon successful connection.
         """
         if hasattr(self, "serial_protocol"):
-            print(f"Replacing existing {self.serial_protocol} serial connection with FS.")
+            print(
+                f"Replacing existing {self.serial_protocol} serial connection with FS."
+            )
         self.serial_protocol = "FS"
         self.device = serial.Serial(
             port=port,

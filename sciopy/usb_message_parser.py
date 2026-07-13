@@ -78,7 +78,9 @@ def describe_message(message):
     description = f"{command_name} (0x{command_tag:02X})"
 
     if command_tag == 0x18:
-        status = msg_dict.get(hex(message[2]), f"Unknown system status 0x{message[2]:02X}")
+        status = msg_dict.get(
+            hex(message[2]), f"Unknown system status 0x{message[2]:02X}"
+        )
         return f"{description}: {status}"
 
     if command_tag in {0xB0, 0xB1}:
@@ -208,7 +210,9 @@ class MessageParser:
         Resets the Current EITFrame.
         """
         if self.setup is None:
-            raise RuntimeError("A measurement setup is required to create an EIT frame.")
+            raise RuntimeError(
+                "A measurement setup is required to create an EIT frame."
+            )
         self.iInjIndex = 0
         self.iSaveCounter = 0
         self.CurrentFrame = EITFrame(
