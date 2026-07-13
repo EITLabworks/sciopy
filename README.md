@@ -16,6 +16,19 @@ To communicate with the Sciospec instrument over USB on Windows, you must instal
 > To restore the original behavior, you will need to uninstall the driver manually.  
 > *(This rollback process has not been fully tested.)*
 
+
+### Linux/Unix Platforms
+
+Clone the repository, then create and activate the Conda environment:
+
+```bash
+conda create --file environment.yml
+conda activate sciopy
+pip install -e .
+```
+
+- FTDI Driver installation: https://www.ftdichip.com/old2020/Drivers/D2XX.htm
+
 #### Install `libusb` using Zadig
 
 1. Download and install Zadig:  
@@ -33,17 +46,6 @@ To communicate with the Sciospec instrument over USB on Windows, you must instal
 
 ---
 
-### All Platforms
-
-Clone the repository, then create and activate the Conda environment:
-
-```bash
-conda create --file environment.yml
-conda activate sciopy
-pip install -e .
-```
-
-- FTDI Driver installation: https://www.ftdichip.com/old2020/Drivers/D2XX.htm
 
 ## Contact
 
