@@ -37,7 +37,7 @@ def create_empty_2d_mesh(
     """
     mesh_obj = mesh.create(n_el=n_el, h0=h0)
     mesh_obj.node[:, 2] = z_level
-    mesh_obj.el_pos = np.roll(np.arange(16)[::-1], -3)
+    mesh_obj.el_pos = np.roll(np.arange(n_el)[::-1], -3)
     if default_perm != 1.0:
         mesh_obj.perm_array = mesh_obj.perm_array * default_perm
         mesh_obj.perm = default_perm

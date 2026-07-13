@@ -1,32 +1,14 @@
 """Module for interfacing with the Sciospec EIT devices via serial communication"""
 
-try:
-    import serial
-except ImportError:
-    print("Could not import module: serial")
+import serial
 
 from .com_util import (
     clTbt_dp,
     clTbt_sp,
-    del_hex_in_list,
-    reshape_full_message_in_bursts,
-    split_bursts_in_frames,
 )
 
 import numpy as np
 from pyftdi.ftdi import Ftdi
-
-msg_dict = {
-    "0x01": "No message inside the message buffer",
-    "0x02": "Timeout: Communication-timeout (less data than expected)",
-    "0x04": "Wake-Up Message: System boot ready",
-    "0x11": "TCP-Socket: Valid TCP client-socket connection",
-    "0x81": "Not-Acknowledge: Command has not been executed",
-    "0x82": "Not-Acknowledge: Command could not be recognized",
-    "0x83": "Command-Acknowledge: Command has been executed successfully",
-    "0x84": "System-Ready Message: System is operational and ready to receive data",
-    "0x92": "Data holdup: Measurement data could not be sent via the master interface",
-}
 
 from .sciopy_dataclasses import EitMeasurementSetup
 from .usb_message_parser import (
@@ -54,7 +36,6 @@ class EIT_16_32_64_128:
         self.n_el = n_el
         self.channel_group = self.init_channel_group()
         self.print_msg = True
-        self.ret_hex_int = None
         self.cMessageParser = None
         self.setup = None
 
@@ -75,7 +56,7 @@ class EIT_16_32_64_128:
             return [ch + 1 for ch in range(self.n_el // 16)]
         else:
             raise ValueError(
-                f"Unallowed value: {self.n_el}. Please set 16, 32, 48 or 64 electrode mode."
+                f"Unallowed value: {self.n_el}. Please set 16, 32, 48, 64 or 128 electrode mode."
             )
 
     def connect_device_HS(self, url: str = "ftdi://ftdi:232h/1", baudrate: int = 9000):
@@ -98,11 +79,8 @@ class EIT_16_32_64_128:
             Any exceptions raised by the FTDI library during device initialization or configuration.
         """
         if hasattr(self, "serial_protocol"):
-            print(
-                "Serial connection 'self.serial_protocol' already defined as {self.serial_protocol}."
-            )
-        else:
-            self.serial_protocol = "HS"
+            print(f"Replacing existing {self.serial_protocol} serial connection with HS.")
+        self.serial_protocol = "HS"
 
         serial = Ftdi().create_from_url(url=url)
         serial.purge_buffers()
@@ -131,11 +109,8 @@ class EIT_16_32_64_128:
             - Prints a confirmation message upon successful connection.
         """
         if hasattr(self, "serial_protocol"):
-            print(
-                "Serial connection 'self.serial_protocol' already defined as {self.serial_protocol}."
-            )
-        else:
-            self.serial_protocol = "FS"
+            print(f"Replacing existing {self.serial_protocol} serial connection with FS.")
+        self.serial_protocol = "FS"
         self.device = serial.Serial(
             port=port,
             baudrate=baudrate,
@@ -158,104 +133,46 @@ class EIT_16_32_64_128:
 
     def send_message(self, message):
         """
-        Reads data from a USB device, processes received messages, and returns the data in the specified format.
-
-        The method continuously reads from the device until no more data is received, then processes the received bytes.
-        It converts the received data to hexadecimal format and attempts to identify a specific message index.
-        Depending on the value of `self.ret_hex_int`, it returns the data as hexadecimal, integer, or both.
-
-        Prints diagnostic messages if `self.print_msg` is True.
-
-        Returns:
-            list[str]: List of received data in hexadecimal format if `self.ret_hex_int == "hex"`.
-            list[int]: List of received data as integers if `self.ret_hex_int == "int"`.
-            tuple: Both integer and hexadecimal lists if `self.ret_hex_int == "both"`.
-            None: If `self.ret_hex_int` is None.
+        Sends bytes using the protocol selected by ``connect_device_HS`` or
+        ``connect_device_FS``.
         """
         if self.serial_protocol == "HS":
             self.device.write_data(message)
         elif self.serial_protocol == "FS":
             self.device.write(message)
+        else:
+            raise ValueError(f"Unsupported serial protocol: {self.serial_protocol!r}")
 
     def read_message(self):
         """
-        Wrapper function to read single bytes from the device. Communication method is based on the defined serial
-        protocol.
-
-        Return:
-            A single byte read from the device.
-
-        Reads data from a USB high-speed device, processes received messages, and returns the data in various formats.
-
-        The method continuously reads data from the device until no more data is received. It converts the received bytes to hexadecimal format,
-        searches for a specific message index, and prints corresponding messages if enabled. The returned data format depends on the value of
-        `self.ret_hex_int` ("hex", "int", "both", or None).
-
-        Returns:
-            list[str]: List of received data in hexadecimal format if `self.ret_hex_int == "hex"`.
-            list[int]: List of received data as integers if `self.ret_hex_int == "int"`.
-            tuple[list[int], list[str]]: Both integer and hexadecimal lists if `self.ret_hex_int == "both"`.
-            None: If `self.ret_hex_int` is None.
-
-        Raises:
-            BaseException: If message index is not found in the received data.
+        Reads one buffer using the connected parser's HS or FS transport.
         """
-        timeout_count = 0
-        received = []
-        received_hex = []
-        data_count = 0
-
-        while True:
-            buffer = self.read_message()
-            if buffer:
-                received.extend(buffer)
-                data_count += len(buffer)
-                timeout_count = 0
-                continue
-            timeout_count += 1
-            if timeout_count >= 1:
-                # Break if we haven't received any data
-                break
-
-            received = "".join(str(received))  # If you need all the data
-        received_hex = [hex(receive) for receive in received]
-        try:
-            msg_idx = received_hex.index("0x18")
-            if self.print_msg:
-                print(msg_dict[received_hex[msg_idx + 2]])
-        except BaseException:
-            if self.print_msg:
-                print(msg_dict["0x01"])
-            # self.print_msg = False
-        if self.print_msg:
-            print("message buffer:\n", received_hex)
-            print("message length:\t", data_count)
-
-        if self.ret_hex_int is None:
-            return
-        elif self.ret_hex_int == "hex":
-            return received_hex
-        elif self.ret_hex_int == "int":
-            return received
-        elif self.ret_hex_int == "both":
-            return received, received_hex
+        if self.cMessageParser is None:
+            raise RuntimeError("No device connected.")
+        return self.cMessageParser.device_read()
 
     def SystemMessageCallback(self):
         """
-        Handles system messages based on the selected serial protocol.
+        Reads and handles pending messages from the connected device.
 
-        Depending on the value of `self.serial_protocol`, this method delegates
-        the handling of system messages to the appropriate callback:
-            - If `self.serial_protocol` is "HS", calls `SystemMessageCallback_usb_hs()`.
-            - If `self.serial_protocol` is "FS", calls `SystemMessageCallback_usb_fs()`.
+        The message parser is configured for the selected serial protocol when
+        the device is connected, so both HS and FS connections use the same
+        parsing entry point here.
 
-        Raises:
-            AttributeError: If the required callback methods are not defined.
+        Returns:
+            list: Measurement frames collected by the message parser. For a
+            system-message-only buffer this list is empty.
         """
-        if self.serial_protocol == "HS":
-            self.SystemMessageCallback_usb_hs()
-        elif self.serial_protocol == "FS":
-            self.SystemMessageCallback_usb_fs()
+        if self.cMessageParser is None:
+            raise RuntimeError("No device connected.")
+        self.cMessageParser.bPrintMessages = self.print_msg
+        return self.cMessageParser.read_usb_till_timeout(
+            bSaveData=False,
+            bDeleteDataFrame=True,
+            # A callback can run directly after connecting, before a
+            # measurement setup (and therefore an EIT frame) exists.
+            bStartReset=False,
+        )
 
     def write_command_string(self, command):
         """
@@ -271,10 +188,17 @@ class EIT_16_32_64_128:
         Raises:
             AttributeError: If `self.device` does not have the required method for the selected protocol.
         """
+        if self.cMessageParser is None:
+            raise RuntimeError("No device connected.")
         self.cMessageParser.bPrintMessages = self.print_msg
+        self.cMessageParser.set_pending_command(command)
         self.send_message(command)
         self.cMessageParser.read_usb_till_timeout(
-            bSaveData=False, bDeleteDataFrame=True
+            bSaveData=False,
+            bDeleteDataFrame=True,
+            # Command responses do not require an EIT measurement frame and
+            # commands such as GetDeviceInfo can run before a setup exists.
+            bStartReset=False,
         )
 
     # --- sciospec device commands
@@ -389,6 +313,14 @@ class EIT_16_32_64_128:
         - Output configuration is enabled for excitation, frequency stack, and timestamp.
         """
 
+        if not isinstance(setup, EitMeasurementSetup):
+            raise TypeError("setup must be an EitMeasurementSetup instance.")
+        if setup.n_el != self.n_el:
+            raise ValueError(
+                "Number of electrodes in setup configuration must match "
+                "EIT_16_32_64_128 initialization."
+            )
+
         self.setup = setup
         self.cMessageParser.set_measurement_setup(self.setup)
         self.print_msg = False
@@ -465,9 +397,6 @@ class EIT_16_32_64_128:
         )
 
         # Set injection config
-        assert setup.n_el == self.n_el, print(
-            "Number of electrodes in setup configuration must match Eit_16_32_64_128() initialization."
-        )
         el_inj = np.arange(1, setup.n_el + 1)
         el_gnd = np.roll(el_inj, -(setup.inj_skip + 1))
         for v_el, g_el in zip(el_inj, el_gnd):
@@ -509,86 +438,58 @@ class EIT_16_32_64_128:
         self, meamode: str = "singleended", boundary: str = "internal"
     ):
         """
-        Retrieves and configures the measurement setup for the device based on the specified setup option.
-
-        Parameters:
-            setup_of (str): A string identifier for the desired measurement setup option.
-                Supported options include:
-                    - 'Burst Count' (0x02)
-                    - 'Frame Rate' (0x03)
-                    - 'Excitation Frequencies' (0x04)
-                    - 'Excitation Amplitude' (0x05)
-                    - 'Excitation Sequence' (0x06)
-                    - 'Single-Ended or Differential Measure Mode' (0x08)
-                    - 'Gain Settings' (0x09)
-                    - 'Excitation Switch Type' (0x0C)
-
-        Note:
-            This method sends a command to the device to retrieve or configure the specified measurement setup.
-            The actual translation and handling of the response is TBD (to be implemented).
-        Burst Count                                    2 -> 0x02
-        Frame Rate                                     3 -> 0x03
-        Excitation Frequencies                         4 -> 0x04
-        Excitation Amplitude                           5 -> 0x05
-        Excitation Sequence                            6 -> 0x06
-        Single-Ended or Differential Measure Mode      7 -> 0x08
-        Gain Settings                                  8 -> 0x09
-        Excitation Switch Type                         9 -> 0x0C
-        """
-
-        print("TBD (to be checked)")
-        self.print_msg = True
-        self.write_command_string(bytearray([0xB1, 0x01, setup_of, 0xB1]))
-        print("TBD: Translation")
-        self.print_msg = False
-
-    def StartStopMeasurement(self, return_as="pot_mat"):
-        """
-        Starts and stops a measurement process using the configured serial protocol (HS or FS).
-        Sends appropriate commands to the device to initiate and terminate measurement.
-        Processes the received data by removing hexadecimal values, reshaping messages into bursts,
-        and splitting bursts into frames. Stores the processed data in `self.data`.
+        Updates the measurement mode and its channel-group boundary behavior.
 
         Args:
-            return_as (str, optional): Specifies the format of the returned data.
-                - "hex": Returns the processed data as a list of hexadecimal values.
-                - "pot_mat": Returns the processed data as a matrix using `get_data_as_matrix()`.
-                Default is "pot_mat".
-
-        Returns:
-            list or matrix: The measurement data in the format specified by `return_as`.
+            meamode: One of ``singleended``, ``skip0``, ``skip2`` or ``skip4``.
+            boundary: ``internal`` for each channel group or ``external`` for
+                all connected channels.
         """
-        if self.serial_protocol == "HS":
-            self.device.write_data(bytearray([0xB4, 0x01, 0x01, 0xB4]))
-            self.ret_hex_int = "hex"
-            self.print_msg = False
+        mode_options = {
+            "singleended": 0x01,
+            "skip0": 0x02,
+            "skip2": 0x03,
+            "skip4": 0x04,
+        }
+        if meamode not in mode_options:
+            raise ValueError(
+                f"Unknown measurement mode {meamode!r}; expected one of "
+                f"{', '.join(mode_options)}."
+            )
+        boundary_options = {"internal": 0x01, "external": 0x02}
+        if boundary not in boundary_options:
+            raise ValueError(
+                f"Unknown boundary {boundary!r}; expected 'internal' or 'external'."
+            )
 
-            data = self.SystemMessageCallback_usb_hs()
+        self.print_msg = True
+        self.write_command_string(
+            bytearray(
+                [
+                    0xB0,
+                    0x03,
+                    0x08,
+                    mode_options[meamode],
+                    boundary_options[boundary],
+                    0xB0,
+                ]
+            )
+        )
+        self.print_msg = False
 
-            self.device.write_data(bytearray([0xB4, 0x01, 0x00, 0xB4]))
-            self.ret_hex_int = None
-            self.SystemMessageCallback()
+    def GetMeasurementSetup(self, setup_of: int):
+        """
+        Requests one measurement setup value from the device.
 
-        elif self.serial_protocol == "FS":
-            self.device.write(bytearray([0xB4, 0x01, 0x01, 0xB4]))
-            self.ret_hex_int = "hex"
-            self.print_msg = False
-
-        data = self.SystemMessageCallback()
-
-        self.send_message(bytearray([0xB4, 0x01, 0x00, 0xB4]))
-        self.ret_hex_int = None
-        self.SystemMessageCallback()
-
-        data = del_hex_in_list(data)
-        data = reshape_full_message_in_bursts(data, self.setup)
-        data = split_bursts_in_frames(data, self.setup.burst_count, self.channel_group)
-        self.data = data
-
-        if return_as == "hex":
-            return self.data
-        elif return_as == "pot_mat":
-            return self.get_data_as_matrix()
+        Args:
+            setup_of: Setup identifier, for example 0x02 for burst count,
+                0x03 for frame rate or 0x04 for excitation frequencies.
+        """
+        if not isinstance(setup_of, int) or not 0 <= setup_of <= 0xFF:
+            raise ValueError("setup_of must be a byte-sized integer.")
+        self.print_msg = True
+        self.write_command_string(bytearray([0xB1, 0x01, setup_of, 0xB1]))
+        self.print_msg = False
 
     def StartStopMeasurement(
         self,
@@ -623,6 +524,13 @@ class EIT_16_32_64_128:
         Returns:
             list or matrix: The measurement data in the format specified by `return_as`.
         """
+
+        if self.cMessageParser is None:
+            raise RuntimeError("No device connected.")
+        if self.setup is None:
+            raise RuntimeError("SetMeasurementSetup must be called before measuring.")
+        if return_as not in {"hex", "pot_mat", "eitframe"}:
+            raise ValueError("return_as must be 'hex', 'pot_mat' or 'eitframe'.")
 
         # Start measurement
         self.cMessageParser.clear_out_data()
@@ -669,43 +577,19 @@ class EIT_16_32_64_128:
         elif return_as == "eitframe":
             return data
 
-    def get_data_as_matrix(self):
+    def get_data_as_matrix(self, data=None):
         """
-        Converts the raw EIT data into a 3D matrix of potentials.
+        Converts parsed EIT frames into a complex-valued NumPy matrix.
 
-        The resulting matrix has the shape (burst_count, n_el, n_el), where:
-            - burst_count: Number of bursts in the measurement setup.
-            - n_el: Number of electrodes.
-
-        For each burst, the method iterates through its frames, grouping channel data
-        into electrode signals and arranging them in the matrix according to their channel group.
-
-        After processing, self.data is replaced with the resulting matrix.
-
-        Returns:
-            np.ndarray: A 3D complex-valued matrix containing the electrode potentials
-            for each burst and channel group.
+        Args:
+            data: Optional list of EIT frames. If omitted, the frames currently
+                held by the message parser are used.
         """
-        pot_matrix = np.empty(
-            (self.setup.burst_count, self.n_el, self.n_el), dtype=complex
-        )
-
-        for b_c, burst in enumerate(self.data):
-            row = -1
-            for frame in burst:
-                curr_grp = frame.channel_group
-                if curr_grp == 1:
-                    row += 1
-                el_signs = list()
-                for ch in range(16):
-                    el_signs.append(frame.__dict__[f"ch_{ch + 1}"])
-
-                el_signs = np.array(el_signs)
-                start_idx = (curr_grp - 1) * 16
-                stop_idx = curr_grp * 16
-                pot_matrix[b_c, row, start_idx:stop_idx] = el_signs
-        self.data = pot_matrix
-        return pot_matrix
+        if data is None:
+            if self.cMessageParser is None:
+                raise RuntimeError("No device connected.")
+            data = self.cMessageParser.ppcData
+        return get_data_as_matrix(data)
 
     def SetOutputConfiguration(self):
         print("TBD")
@@ -714,13 +598,13 @@ class EIT_16_32_64_128:
         self.print_msg = True
         # |-- Excitation setting | [CT] 02 01 [enable/disable] [CT]
         print("Excitation setting: [enable/disable]")
-        self.write_command_string(bytearray([0xB3, 0x01, 0x01, 0xB2]))
+        self.write_command_string(bytearray([0xB3, 0x01, 0x01, 0xB3]))
         # |-- Current row in the frequency stack | [CT] 02 02 [enable/disable] [CT]
         print("Current row in the frequency stack: [enable/disable]")
-        self.write_command_string(bytearray([0xB3, 0x01, 0x02, 0xB2]))
+        self.write_command_string(bytearray([0xB3, 0x01, 0x02, 0xB3]))
         # |-- Timestamp | [CT] 02 03 [enable/disable] [CT]
         print("Timestamp: [enable/disable]")
-        self.write_command_string(bytearray([0xB3, 0x01, 0x03, 0xB2]))
+        self.write_command_string(bytearray([0xB3, 0x01, 0x03, 0xB3]))
         self.print_msg = False
 
     def GetDeviceInfo(self):

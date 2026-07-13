@@ -18,7 +18,13 @@ def norm_data(data: np.ndarray) -> np.ndarray:
     np.ndarray
         normalized data
     """
-    return (data - np.min(data)) / (np.max(data) - np.min(data))
+    data = np.asarray(data)
+    if data.size == 0:
+        raise ValueError("Cannot normalize an empty array.")
+    data_range = np.max(data) - np.min(data)
+    if data_range == 0:
+        return np.zeros_like(data, dtype=float)
+    return (data - np.min(data)) / data_range
 
 
 def plot_potential_matrix(sample: np.lib.npyio.NpzFile) -> None:

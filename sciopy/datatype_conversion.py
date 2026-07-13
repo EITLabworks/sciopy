@@ -30,12 +30,13 @@ def del_hex_in_list(lst: list) -> np.ndarray:
     np.ndarray
         cleared message
     """
-    return np.array(
-        [
-            "0" + ele.replace("0x", "") if len(ele) == 1 else ele.replace("0x", "")
-            for ele in lst
-        ]
-    )
+    result = []
+    for element in lst:
+        value = int(element, 16) if isinstance(element, str) else int(element)
+        if not 0 <= value <= 0xFF:
+            raise ValueError(f"Value {element!r} is not a byte.")
+        result.append(f"{value:02x}")
+    return np.asarray(result)
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -53,10 +54,6 @@ def single_hex_to_int(str_num: str) -> int:
     int
         integer number
     """
-    if len(str_num) == 1:
-        str_num = f"0x0{str_num}"
-    else:
-        str_num = f"0x{str_num}"
     return int(str_num, 16)
 
 
@@ -75,9 +72,7 @@ def bytesarray_to_float(bytes_array: np.ndarray) -> float:
     float
         single precision float
     """
-    bytes_array = [int(b, 16) for b in bytes_array]
-    bytes_array = bytes(bytes_array)
-    return struct.unpack("!f", bytes(bytes_array))[0]
+    return struct.unpack("!f", _hex_array_to_bytes(bytes_array, expected_length=4))[0]
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -95,7 +90,10 @@ def byteintarray_to_float(bytes_array: np.ndarray) -> float:
     float
         single precision float
     """
-    return struct.unpack("!f", bytes(bytes_array))[0]
+    values = bytes(bytes_array)
+    if len(values) != 4:
+        raise ValueError("A single-precision float requires exactly 4 bytes.")
+    return struct.unpack("!f", values)[0]
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -113,9 +111,7 @@ def bytesarray_to_double(bytes_array: np.ndarray) -> float:
     float
         double precision float
     """
-    bytes_array = [int(b, 16) for b in bytes_array]
-    bytes_array = bytes(bytes_array)
-    return struct.unpack("!d", bytes(bytes_array))[0]
+    return struct.unpack("!d", _hex_array_to_bytes(bytes_array, expected_length=8))[0]
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -133,8 +129,7 @@ def bytesarray_to_byteslist(bytes_array: np.ndarray) -> list:
     list
         list of bytes
     """
-    bytes_array = [int(b, 16) for b in bytes_array]
-    return bytes(bytes_array)
+    return _hex_array_to_bytes(bytes_array)
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -170,12 +165,9 @@ def four_byte_to_int(bytelist):
     int
         integer number
     """
-    return (
-        TWOPOWER24 * bytelist[0]
-        + TWOPOWER16 * bytelist[1]
-        + TWOPOWER8 * bytelist[2]
-        + bytelist[3]
-    )
+    if len(bytelist) != 4:
+        raise ValueError("Expected exactly 4 bytes.")
+    return int.from_bytes(bytes(int(value) for value in bytelist), "big")
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -192,7 +184,9 @@ def two_byte_to_int(bytelist):
     int
         integer number
     """
-    return TWOPOWER8 * bytelist[0] + bytelist[1]
+    if len(bytelist) != 2:
+        raise ValueError("Expected exactly 2 bytes.")
+    return int.from_bytes(bytes(int(value) for value in bytelist), "big")
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -208,7 +202,11 @@ def bytelist_to_int(bytelist):
     int
         integer number
     """
-    r = bytelist[-1]
-    for j in range(2, len(bytelist)):
-        r += bytelist[-j] * 2 ** ((j - 1) * 8)
-    return r
+    return int.from_bytes(bytes(int(value) for value in bytelist), "big")
+
+
+def _hex_array_to_bytes(values, expected_length=None):
+    result = bytes(int(value, 16) if isinstance(value, str) else int(value) for value in values)
+    if expected_length is not None and len(result) != expected_length:
+        raise ValueError(f"Expected exactly {expected_length} bytes.")
+    return result
