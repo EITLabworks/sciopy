@@ -23,7 +23,7 @@ setup(
     ],
     extras_require={
         "plot": ["matplotlib>=3.6", "pyeit>=1.2"],
-        "test": ["pytest>=7", "ruff>=0.11"],
+        "test": ["matplotlib>=3.6", "pytest>=7", "ruff>=0.11"],
     },
     classifiers=[
         "Programming Language :: Python :: 3",
