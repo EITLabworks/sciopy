@@ -19,8 +19,8 @@ SYSTEM_MESSAGES = {
     0x82: "Not-Acknowledge: Command could not be recognized",
     0x83: "Command-Acknowledge: Command has been executed successfully",
     0x84: "System-Ready Message: System is operational and ready to receive data",
-    0x90: "Overcurrent detected",
-    0x91: "Overvoltage detected",
+    0x90: "Overcurrent detected: Value of DC current on W-ports exceeds capability of configured current range",
+    0x91: "Overvoltage detected: Value of DC voltage difference between R and WS port exceeds capability of configured voltage range",
 }
 
 COMMANDS = {
@@ -36,7 +36,7 @@ COMMANDS = {
     0xB5: "Get ExtensionPort Module",
     0xB6: "Set Setup",
     0xB7: "Get Setup",
-    0xB8: "Start/Stop Measure",
+    0xB8: "Start Measure",
     0xB9: "Set Sync Time",
     0xBA: "Get Sync Time",
     0xBD: "Set Ethernet Configuration",
@@ -159,7 +159,7 @@ class ISX_3:
         Parameters
         ----------
         port : str
-            Serial device name, for example ``"COM3"`` or ``"/dev/ttyUSB0"``.
+            Serial device name, for example ``"COM3"`` in windows or ``"/dev/ttyUSB0"`` in Linux/Unix systems.
         baudrate : int, default=9600
             Serial baud rate.
         timeout : float, default=1
