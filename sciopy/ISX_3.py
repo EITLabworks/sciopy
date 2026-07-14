@@ -49,7 +49,7 @@ COMMANDS = {
 
 OPTION_CODES = {"timestamp_ms": 0x01, "timestamp_us": 0x02, "current_range": 0x04}
 MEASUREMENT_MODES = {"2-point": 0x01, "4-point": 0x02, "3-point": 0x03}
-MEASUREMENT_CHANNELS = {"bnc": 0x01, "extension": 0x02, "extension2": 0x03}
+MEASUREMENT_CHANNELS = {"bnc": 0x01, "extension": 0x02, "mux": 0x03}
 CURRENT_RANGES = {"auto": 0x00, "10ma": 0x01, "100ua": 0x02, "1ua": 0x04, "10na": 0x06}
 VOLTAGE_RANGES = {"auto": 0x00, "1v": 0x01, "90mv": 0x02}
 EXCITATION_TYPES = {"voltage": 0x01, "current": 0x02}
