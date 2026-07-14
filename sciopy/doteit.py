@@ -75,12 +75,9 @@ def list_eit_files(path: str) -> list:
     list
         list of files with .eit ending
     """
-    global src_list
-    try:
-        src_list = [_ for _ in os.listdir(path) if _.endswith(".eit")]
-        return src_list
-    except BaseException:
-        print(f"Can not find a .eit file in:\n {path}")
+    if not os.path.isdir(path):
+        raise FileNotFoundError(f"Directory does not exist: {path}")
+    return sorted(name for name in os.listdir(path) if name.lower().endswith(".eit"))
 
 
 def list_all_files(path: str) -> None:
@@ -119,7 +116,7 @@ def single_eit_in_pickle(fname: str, s_path: str) -> None:
 
     frame = doteit_in_SingleEitFrame(read_content)
 
-    with open(f"{s_path}/{frame.setup_name}.pickle", "wb") as f:
+    with open(os.path.join(s_path, f"{frame.setup_name}.pickle"), "wb") as f:
         pickle.dump(frame, f)
 
 
@@ -137,8 +134,13 @@ def load_pickle_to_dict(path: str) -> dict:
     dict
         dicionary of the loaded pickle file
     """
-    tmp = np.load(path, allow_pickle=True).__dict__
-    return tmp
+    with open(path, "rb") as file:
+        value = pickle.load(file)
+    if isinstance(value, dict):
+        return value
+    if hasattr(value, "__dict__"):
+        return vars(value)
+    raise TypeError("Pickle must contain a dictionary or an object with attributes.")
 
 
 def convert_fulldir_doteit_to_pickle(lpath: str, spath: str) -> None:
@@ -158,7 +160,7 @@ def convert_fulldir_doteit_to_pickle(lpath: str, spath: str) -> None:
     """
     objects = list_eit_files(lpath)
     for obj in objects:
-        fname = lpath + obj
+        fname = os.path.join(lpath, obj)
         single_eit_in_pickle(fname, spath)
         print("converted:", obj)
     print("\t Saved in", spath)
@@ -181,9 +183,9 @@ def convert_fulldir_doteit_to_npz(lpath: str, spath: str) -> None:
     """
     objects = list_eit_files(lpath)
     for obj in objects:
-        fname = lpath + obj
+        fname = os.path.join(lpath, obj)
         with open(fname, "r") as file:
             read_content = file.read().split("\n")
 
         frame = doteit_in_SingleEitFrame(read_content)
-        np.savez(f"{spath}{frame.setup_name}.npz", **(frame.__dict__))
+        np.savez(os.path.join(spath, f"{frame.setup_name}.npz"), **vars(frame))

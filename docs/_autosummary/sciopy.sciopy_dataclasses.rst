@@ -8,6 +8,7 @@
 
    .. autosummary::
    
+      EITFrame
       EisMeasurementSetup
       EitMeasurementSetup
       PreperationConfig

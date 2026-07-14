@@ -11,12 +11,12 @@ import time
 
 import os
 from .sciopy_dataclasses import EitMeasurementSetup, EITFrame
-from .com_util import byteintarray_to_float, two_byte_to_int
+from .datatype_conversion import byteintarray_to_float, two_byte_to_int
 from datetime import datetime
 
 # -------------------------------------------------------------------------------------------------------------------- #
 msg_dict = {
-    "0x01": "No message inside the message buffer",
+    "0x01": "Frame-Not-Acknowledge: Incorrect syntax",
     "0x02": "Timeout: Communication-timeout (less data than expected)",
     "0x04": "Wake-Up Message: System boot ready",
     "0x11": "TCP-Socket: Valid TCP client-socket connection",
@@ -24,8 +24,80 @@ msg_dict = {
     "0x82": "Not-Acknowledge: Command could not be recognized",
     "0x83": "Command-Acknowledge: Command has been executed successfully",
     "0x84": "System-Ready Message: System is operational and ready to receive data",
-    "0x92": "Data holdup: Measurement data could not be sent via the master interface",
+    "0x91": "Data holdup: Measurement data could not be sent via the master interface",
 }
+
+COMMAND_INFO = {
+    0x18: "Acknowledge / General System Message",
+    0x90: "Save Settings",
+    0xA1: "Software Reset",
+    0xB0: "Set Measurement Setup",
+    0xB1: "Get Measurement Setup",
+    0xB2: "Set Output Configuration",
+    0xB3: "Get Output Configuration",
+    0xB4: "Start/Stop Measurement",
+    0xB5: "Get Temperature",
+    0xC6: "Set Battery Control",
+    0xC7: "Get Battery Control",
+    0xC8: "Set LED Control",
+    0xC9: "Get LED Control",
+    0xCB: "FrontIOs",
+    0xCC: "Power Plug Detect",
+    0xCF: "TCP Connection Watchdog",
+    0xD1: "Get Device Info",
+    0xD2: "Get Firmware IDs",
+}
+
+MEASUREMENT_SETUP_OPTIONS = {
+    0x01: "Reset Setup",
+    0x02: "Burst Count",
+    0x03: "Frame Rate",
+    0x04: "Excitation Frequencies",
+    0x05: "Excitation Amplitude",
+    0x06: "Excitation Sequence",
+    0x08: "Single-Ended or Differential Measurement Mode",
+    0x09: "Gain Settings",
+    0x0C: "Excitation Switch Type",
+    0x0D: "ADC Range",
+}
+
+OUTPUT_CONFIGURATION_OPTIONS = {
+    0x01: "Excitation Setting",
+    0x02: "Current Row in Frequency Stack",
+    0x03: "Timestamp",
+}
+
+
+def describe_message(message):
+    """Return the command information defined by the Sciospec EIT manual."""
+    if len(message) < 3:
+        return "Incomplete Sciospec message"
+
+    command_tag = message[0]
+    command_name = COMMAND_INFO.get(command_tag, "Unknown Command")
+    description = f"{command_name} (0x{command_tag:02X})"
+
+    if command_tag == 0x18:
+        status = msg_dict.get(
+            hex(message[2]), f"Unknown system status 0x{message[2]:02X}"
+        )
+        return f"{description}: {status}"
+
+    if command_tag in {0xB0, 0xB1}:
+        option = MEASUREMENT_SETUP_OPTIONS.get(
+            message[2], f"Unknown option 0x{message[2]:02X}"
+        )
+        description += f" – {option}"
+    elif command_tag in {0xB2, 0xB3}:
+        option = OUTPUT_CONFIGURATION_OPTIONS.get(
+            message[2], f"Unknown option 0x{message[2]:02X}"
+        )
+        description += f" – {option}"
+
+    payload = " ".join(f"{value:02X}" for value in message[2:-1])
+    if payload:
+        description += f": {payload}"
+    return description
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -78,6 +150,7 @@ class MessageParser:
         self.iSaveCounter = 0  # Unused
         self.ppcData = []
         self.iInjIndex = 0
+        self.pending_command = None
 
         # Device setup
         self.cDevice = device
@@ -100,6 +173,10 @@ class MessageParser:
         self.setup = eitsetup
         self.set_measurement_setup(eitsetup)
 
+    def set_pending_command(self, command):
+        """Remember a command so its following ACK can be labelled."""
+        self.pending_command = list(command)
+
     # ---------------------------------------------------------------------------------------------------------------- #
     def set_measurement_setup(self, setup: EitMeasurementSetup):
         """
@@ -108,7 +185,7 @@ class MessageParser:
             setup: EITMeasurementSetup object
         """
         self.setup = setup
-        if setup != None:
+        if setup is not None:
             self.iMaxChannelGroups = setup.n_el // 16
             self.iNumExcitationSettings = setup.n_el  # todo should be independently set
             self.iNumFreqSettings = 1  # todo
@@ -132,6 +209,10 @@ class MessageParser:
         """
         Resets the Current EITFrame.
         """
+        if self.setup is None:
+            raise RuntimeError(
+                "A measurement setup is required to create an EIT frame."
+            )
         self.iInjIndex = 0
         self.iSaveCounter = 0
         self.CurrentFrame = EITFrame(
@@ -153,15 +234,39 @@ class MessageParser:
         Deletes saved data frames
         """
         self.ppcData = []
-        self.reset_new_data_frame()
+        if self.setup is None:
+            self.CurrentFrame = None
+        else:
+            self.reset_new_data_frame()
 
     # ---------------------------------------------------------------------------------------------------------------- #
     def init_parser(self):
         """
-        Initializes the parser generator
+        Initializes the receive buffer used by the USB stream decoder.
         """
-        self.Parser = byte_parser()
-        next(self.Parser)
+        self._receive_buffer = bytearray()
+
+    def parse_received_bytes(self, data):
+        """Add a transport chunk and return all complete protocol messages."""
+        if data:
+            self._receive_buffer.extend(data)
+
+        messages = []
+        while len(self._receive_buffer) >= 2:
+            payload_length = self._receive_buffer[1]
+            message_length = payload_length + 3
+            if len(self._receive_buffer) < message_length:
+                break
+
+            message = list(self._receive_buffer[:message_length])
+            del self._receive_buffer[:message_length]
+            if message[-1] != message[0]:
+                raise ValueError(
+                    f"Invalid message framing: starts with {hex(message[0])} "
+                    f"and ends with {hex(message[-1])}."
+                )
+            messages.append(message)
+        return messages
 
     # ---------------------------------------------------------------------------------------------------------------- #
     def read_fs(self):
@@ -220,24 +325,21 @@ class MessageParser:
         Returns:
             List of received data eit frames, no Status messages are saved
         """
-        if bStartReset:
+        if bStartReset and self.setup is not None:
             self.reset_new_data_frame()
-        iMessageCount = 0
         bMessageStarted = False
         timeout_count = 0
         fEndtime = time.time() + fTime
         while time.time() < fEndtime or bMessageStarted:
             buffer = self.device_read()
             if buffer:
-                message = self.Parser.send(buffer)
-
-                if len(message) > 0:
+                messages = self.parse_received_bytes(buffer)
+                for message in messages:
                     bMessageStarted = False
                     self.interpret_message(
                         message, bSaveData, bDeleteDataFrame, sSavePath
                     )
-                    iMessageCount += 1
-                else:
+                if not messages and self._receive_buffer:
                     bMessageStarted = True
                 timeout_count = 0
                 continue
@@ -248,7 +350,6 @@ class MessageParser:
             if timeout_count >= 100:
                 # Break if we haven't received any data
                 break
-        print(f"{iMessageCount} message(s) received.")
         return self.ppcData
 
     # ---------------------------------------------------------------------------------------------------------------- #
@@ -270,19 +371,16 @@ class MessageParser:
         Returns:
             List of received data eit frames, no Status messages are saved
         """
-        if bStartReset:
+        if bStartReset and self.setup is not None:
             self.reset_new_data_frame()
-        iMessageCount = 0
         timeout_count = 0
         while True:
             buffer = self.device_read()
             if buffer:
-                message = self.Parser.send(buffer)
-                if len(message) > 0:
+                for message in self.parse_received_bytes(buffer):
                     self.interpret_message(
                         message, bSaveData, bDeleteDataFrame, sSavePath
                     )
-                    iMessageCount += 1
                 timeout_count = 0
                 continue
             timeout_count += 1
@@ -290,7 +388,6 @@ class MessageParser:
                 # Break if we haven't received any data
                 break
 
-        print(f"{iMessageCount} message(s) received.")
         return self.ppcData
 
     # ---------------------------------------------------------------------------------------------------------------- #
@@ -309,17 +406,14 @@ class MessageParser:
         if message[0] == 180:  # DATA 0XB4
             self.interpret_data_input(message, bSaveData, bDeleteDataFrame, sSavePath)
         else:
-            mess_hex = [hex(receive) for receive in message]
+            description = describe_message(message)
+            if message[0] == 0x18 and self.pending_command is not None:
+                description = (
+                    f"{describe_message(self.pending_command)} -> {description}"
+                )
+                self.pending_command = None
             if self.bPrintMessages:
-                if message[0] == 24:  # 0x24 Acknowledgement Message
-                    try:
-                        print(
-                            "Message: " + str(mess_hex) + " -> " + msg_dict[mess_hex[2]]
-                        )
-                    except:
-                        print("Message: " + str(mess_hex) + " -> " + msg_dict["0x01"])
-                else:
-                    print("Unknown received message: " + str(mess_hex))
+                print(description)
 
     # ---------------------------------------------------------------------------------------------------------------- #
     def interpret_data_input(
@@ -456,20 +550,19 @@ def load_eit_frames(path):
         List of EITFrame
     """
     loaded = []
-    files = os.listdir(path)
-    files = sorted(files)
-    for f in files:
-        l = np.load(os.path.join(path, f), allow_pickle=True)
-        e = EITFrame(
-            n_el=l["n_el"],
-            excitation_stgs=l["excitation_stgs"],
-            frequency_stgs=l["frequency_stgs"],
-            timestamp1=l["timestamp1"],
-            timestamp2=l["timestamp2"],
-            timestamp_pc=l["timestamp_pc"],
-            ppcData=l["ppcData"],
-        )
-        loaded.append(e)
+    files = sorted(file for file in os.listdir(path) if file.endswith(".npz"))
+    for filename in files:
+        with np.load(os.path.join(path, filename), allow_pickle=True) as data:
+            frame = EITFrame(
+                n_el=data["n_el"],
+                excitation_stgs=data["excitation_stgs"],
+                frequency_stgs=data["frequency_stgs"],
+                timestamp1=data["timestamp1"],
+                timestamp2=data["timestamp2"],
+                timestamp_pc=data["timestamp_pc"],
+                ppcData=data["ppcData"],
+            )
+        loaded.append(frame)
     return loaded
 
 
@@ -483,7 +576,7 @@ def load_eit_frames_into_nparray(path):
     Returns: np.array(ppcData)
     """
     loaded = load_eit_frames(path)
-    l = []
+    data = []
     for frame in loaded:
-        l.append(frame.ppcData)
-    return np.array(l)
+        data.append(frame.ppcData)
+    return np.array(data)

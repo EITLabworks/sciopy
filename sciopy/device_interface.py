@@ -6,10 +6,7 @@ Author ：Patricia Fuchs
 Date ：26.11.2025 14:04
 """
 
-try:
-    import serial
-except ImportError:
-    print("Could not import module: serial")
+import serial
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -20,17 +17,17 @@ class DeviceInterface:
         self.sProtocol = "None"
 
     def send_data(self, data):
-        pass
+        raise NotImplementedError
 
     def read_data(self):
-        return None
+        raise NotImplementedError
 
-
-import serial
+    def close(self):
+        raise NotImplementedError
 
 
 class USB_FS_Device(DeviceInterface):
-    def __init__(self, port: str, baudrate: int = 9600, timeout: int = 9000):
+    def __init__(self, port: str, baudrate: int = 9600, timeout: float = 1):
         super().__init__()
         self.sProtocol = "FS"
         self.device = serial.Serial(
@@ -49,7 +46,13 @@ class USB_FS_Device(DeviceInterface):
     def read_data(self):
         return self.device.read()
 
+    def close(self):
+        self.device.close()
+
 
 class USB_HS_Device(DeviceInterface):
     def __init__(self, port: str, baudrate: int = 9600, timeout: int = 9000):
         super().__init__()
+        raise NotImplementedError(
+            "USB_HS_Device is not implemented; use EIT_16_32_64_128.connect_device_HS()."
+        )
