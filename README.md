@@ -53,5 +53,10 @@ If you have any ideas or other suggestions, please don't hesitate to contact me.
 
 Email: jacob.thoenes@uni-rostock.de
 
+> [!TIP]
+> I developed and tested this package on an Ubuntu/Linux system. If you encounter errors or issues on other operating systems and find a solution, you are welcome to contribute it to this repository.
+>
+> Thank you!
+
 ___
 
