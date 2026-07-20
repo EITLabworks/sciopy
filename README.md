@@ -6,11 +6,11 @@ This package offers the serial interface for communication with an EIT device fr
 
 ### Windows: USB Driver Setup
 
-USB FS:
+USB FS:  
 To communicate with the Sciospec instrument over USB FS on Windows, follow the Linux platform instructions, since they are the same.
 
-USB HS:
-To communicate with the Sciospec instrument over USB (HS)on Windows, you must install the `libusb` driver.
+USB HS:  
+To communicate with the Sciospec instrument over USB (HS) on Windows, you must install the `libusb` driver.
 
 > [!WARNING]
 > Installing the `libusb` driver will prevent the Sciospec instrument from working with the official Sciospec software on the selected USB port (`HS`).
