@@ -15,7 +15,7 @@ To communicate with the Sciospec instrument over USB (HS) on Windows, you must i
 > [!WARNING]
 > Installing the `libusb` driver will prevent the Sciospec instrument from working with the official Sciospec software on the selected USB port (`HS`).
 >
-> After installation, the Sciospec software may no longer recognize the device on that port.
+> After installation, the Sciospec software may no longer recognize the device on that port.  
 >  *(This process has been tested, but not successfully. The understanding is based on the Sciospec documentation that installing the libusb driver should enable usage on Windows, but Python still has communication issues. Using USB HS on Windows is therefore not solved.)*
 >
 > To restore the original behavior, you will need to uninstall the driver manually.  
