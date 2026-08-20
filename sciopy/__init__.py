@@ -12,5 +12,5 @@ __all__ = [
     "EIT_16_32_64_128",
     "EitMeasurementSetup",
     "ISX_3",
-    "EisMeasurementSetup",
+    "EisMeasurementSetup"
 ]

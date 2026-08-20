@@ -13,12 +13,25 @@ class EitMeasurementSetup:
     Attributes:
         burst_count (int): Number of bursts per measurement cycle.
         n_el (int): Number of electrodes used in the measurement.
-        exc_freq (int or float): Excitation frequency in Hz.
+        exc_freq (int or float): Excitation frequency in Hz. Acts as the start
+            (minimum) frequency of a sweep when ``n_freq`` > 1.
         framerate (int or float): Frame rate of the measurement in Hz.
         amplitude (int or float): Amplitude of the excitation signal.
         inj_skip (int or list): Electrode(s) to skip during current injection.
         gain (int): Amplifier gain setting.
         adc_range (int): Analog-to-digital converter range setting.
+        mea_mode (str): Measurement mode, see `update_measurement_mode`.
+        mea_mode_boundary (str): Channel-group boundary behavior, see
+            `update_measurement_mode`.
+        exc_freq_max (int, float or None): Stop (maximum) frequency of a
+            frequency sweep in Hz. Ignored when ``n_freq`` is 1. Defaults to
+            ``exc_freq`` (single-frequency measurement) when left as ``None``.
+        n_freq (int): Number of frequency points measured between
+            ``exc_freq`` and ``exc_freq_max`` (inclusive). ``1`` selects a
+            single-frequency measurement at ``exc_freq``.
+        freq_scale (str): Distribution of frequency points across the sweep,
+            either ``"lin"`` (linear) or ``"log"`` (logarithmic). Ignored
+            when ``n_freq`` is 1.
     """
 
     burst_count: int
@@ -31,7 +44,9 @@ class EitMeasurementSetup:
     adc_range: int
     mea_mode: str = "singleended"
     mea_mode_boundary: str = "internal"
-    # TBD: lin/log/sweep
+    exc_freq_max: Union[int, float, None] = None
+    n_freq: int = 1
+    freq_scale: str = "lin"
 
 
 @dataclass
@@ -225,7 +240,9 @@ class EITFrame:
     ----------
     n_el = Number of used electrodes
     excitation_stgs : np.array [[int1, int2]] , Features the [ESout, ESin] injection electrodes
-    frequency_stgs : List[str] # todo
+    frequency_stgs : np.array of the excitation frequencies used in this frame [Hz],
+                     e.g. [f] for a single-frequency measurement or
+                     [f_min, ..., f_max] (length n_freq) for a frequency sweep.
     timestamp1 : int Timestamp of the very first measured channel group in this frame, milli seconds?
     timestamp2 : int Timestamp of the very last measured channel group in this frame, milli seconds?
     timestamp_pc : int Timestamp of the receiving computer for further data synchronisation from datetime.now().
@@ -238,7 +255,7 @@ class EITFrame:
 
     n_el: int  # Number of used electrodes
     excitation_stgs: npt.NDArray[int]  # Num Excitation Settings X 2
-    frequency_stgs: npt.NDArray[int]  # List of Frequency-Sweep Settings,
+    frequency_stgs: npt.NDArray[float]  # Excitation frequencies of the sweep [Hz]
     timestamp1: int  # [ms]
     timestamp2: int
     timestamp_pc: int
