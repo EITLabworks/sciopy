@@ -6,7 +6,7 @@ ROOT = Path(__file__).parent
 
 setup(
     name="sciopy",
-    version="1.0",
+    version="1.0.1",
     packages=find_packages(),
     author="Jacob P. Thönes",
     author_email="jacob.thoenes@uni-rostock.de",
