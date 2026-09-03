@@ -568,8 +568,9 @@ class ISX_3:
         return self.send_command(0xB1)
 
     def SetExtensionPortChannel(self, counter, reference, working_sense, working):
-        """Configure C, R, WS, and W selections on the extension port. 
-        It adds to the current config instead of creating a new extension port channel."""
+        """Configure C, R, WS, and W selections on the extension port.
+        It adds to the current config instead of creating a new extension port channel.
+        """
         return self.send_command(0xB2, [counter, reference, working_sense, working])
 
     def GetExtensionPortChannel(self):

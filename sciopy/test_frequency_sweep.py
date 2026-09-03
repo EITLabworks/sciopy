@@ -13,7 +13,9 @@ def test_update_excitation_frequencies_builds_valid_sweep_command():
     device = EIT_16_32_64_128(16)
     device.write_command_string = Mock()
 
-    device.update_ExcitationFrequencies(f_min=1_000.0, f_max=100_000.0, f_count=5, f_scale="log")
+    device.update_ExcitationFrequencies(
+        f_min=1_000.0, f_max=100_000.0, f_count=5, f_scale="log"
+    )
 
     expected = bytearray(
         [0xB0, 12, 4]
@@ -76,7 +78,9 @@ def test_set_measurement_setup_uses_excitation_frequencies_sweep(monkeypatch):
         + clTbt_u16(3)
         + [0x00, 0xB0]
     )
-    assert expected in [call.args[0] for call in device.write_command_string.call_args_list]
+    assert expected in [
+        call.args[0] for call in device.write_command_string.call_args_list
+    ]
 
 
 def test_start_stop_measurement_can_configure_sweep_inline():
@@ -129,7 +133,9 @@ def test_message_parser_sizes_frame_for_frequency_sweep():
     assert len(parser.CurrentFrame.ppcData) == (
         parser.iMaxChannelGroups * 16 * parser.iNumExcitationSettings * 3
     )
-    np.testing.assert_allclose(parser.CurrentFrame.frequency_stgs, [1_000.0, 5_500.0, 10_000.0])
+    np.testing.assert_allclose(
+        parser.CurrentFrame.frequency_stgs, [1_000.0, 5_500.0, 10_000.0]
+    )
 
 
 def test_message_parser_defaults_to_single_frequency():

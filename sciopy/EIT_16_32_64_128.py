@@ -467,7 +467,9 @@ class EIT_16_32_64_128:
         # setup.n_freq > 1):
         self.update_ExcitationFrequencies(
             f_min=setup.exc_freq,
-            f_max=setup.exc_freq_max if setup.exc_freq_max is not None else setup.exc_freq,
+            f_max=(
+                setup.exc_freq_max if setup.exc_freq_max is not None else setup.exc_freq
+            ),
             f_count=setup.n_freq,
             f_scale=setup.freq_scale,
         )
