@@ -188,7 +188,7 @@ class MessageParser:
         if setup is not None:
             self.iMaxChannelGroups = setup.n_el // 16
             self.iNumExcitationSettings = setup.n_el  # todo should be independently set
-            self.iNumFreqSettings = 1  # todo
+            self.iNumFreqSettings = getattr(setup, "n_freq", None) or 1
             self.iLenDataperFrame = (
                 self.iMaxChannelGroups
                 * 16
@@ -218,15 +218,45 @@ class MessageParser:
         self.CurrentFrame = EITFrame(
             n_el=self.setup.n_el,
             excitation_stgs=np.zeros((self.iNumExcitationSettings, 2), dtype=int),
-            frequency_stgs=np.zeros((self.iNumFreqSettings,), dtype=int),
-            # todo fill in setup freq settings
+            frequency_stgs=self.get_frequency_list(),
             timestamp1=0,
             timestamp2=0,
             timestamp_pc=0,
             ppcData=np.zeros(
-                self.iMaxChannelGroups * 16 * self.iNumExcitationSettings, dtype=complex
+                self.iMaxChannelGroups
+                * 16
+                * self.iNumExcitationSettings
+                * self.iNumFreqSettings,
+                dtype=complex,
             ),
         )
+
+    # ---------------------------------------------------------------------------------------------------------------- #
+    def get_frequency_list(self) -> np.ndarray:
+        """
+        Returns the excitation frequencies [Hz] of the currently configured
+        setup, distributed between `setup.exc_freq` and `setup.exc_freq_max`
+        according to `setup.n_freq` and `setup.freq_scale` (see
+        `EIT_16_32_64_128.update_ExcitationFrequencies`).
+
+        A single-frequency setup (n_freq == 1, the default) returns a
+        one-element array containing `setup.exc_freq`.
+        """
+        if self.setup is None:
+            return np.zeros((self.iNumFreqSettings,), dtype=float)
+
+        f_min = self.setup.exc_freq
+        n_freq = getattr(self.setup, "n_freq", None) or 1
+        if n_freq <= 1:
+            return np.array([f_min], dtype=float)
+
+        f_max = getattr(self.setup, "exc_freq_max", None)
+        if f_max is None:
+            f_max = f_min
+        f_scale = getattr(self.setup, "freq_scale", "lin")
+        if f_scale == "log":
+            return np.logspace(np.log10(f_min), np.log10(f_max), n_freq)
+        return np.linspace(f_min, f_max, n_freq)
 
     # ---------------------------------------------------------------------------------------------------------------- #
     def clear_out_data(self):
@@ -441,9 +471,14 @@ class MessageParser:
                 ]
                 self.iInjIndex += 1
 
-            # FREQUENCY ROW is set through eitsetup
-            # TODO input not the number of the frequency row, but all injected frequencies, beforehand
-            #   self.CurrentFrame.frequency_stgs = self.iNumFreqSettings
+            # FREQUENCY ROW: the injected frequencies are already filled in
+            # from the measurement setup (see reset_new_data_frame /
+            # get_frequency_list). `freq_group` (1-indexed) tells us which
+            # row of that sweep this particular message belongs to; the
+            # device sends channel-group/excitation/frequency messages in
+            # nested order (excitation outer, frequency inner, see
+            # EITFrame docstring), so appending payloads sequentially below
+            # already lays them out correctly for `get_data_as_matrix`.
 
             # TIMESTAMP
             if self.iSaveCounter == 0:
@@ -504,17 +539,28 @@ def make_results_folder(bCreateResultsFolder: bool, bSaveData: bool, sSavePath: 
 # -------------------------------------------------------------------------------------------------------------------- #
 def get_data_as_matrix(FrameList):
     """
-    List of EITFrames to be reshaped into matrix of [Number frames, num injection settings, n_el]
+    List of EITFrames to be reshaped into a matrix.
+
     Args:
         FrameList: List of EITFrames to be reshaped into matrix
 
     Returns:
-            np.array of eit data of shape [Number frames, num injection settings, n_el]
+        np.array of eit data.
+        - Single-frequency frames (len(f.frequency_stgs) <= 1, the default):
+          shape [Number frames, num injection settings, n_el], unchanged
+          from previous behavior.
+        - Frequency-sweep frames (len(f.frequency_stgs) > 1): shape
+          [Number frames, num injection settings, num frequencies, n_el],
+          per the excitation-outer/frequency-inner/channel-innermost
+          ordering documented on `EITFrame`.
     """
     result = []
     for f in FrameList:
-        L = len(f.ppcData) // len(f.excitation_stgs)
-        result.append(np.reshape(f.ppcData, (len(f.excitation_stgs), L)))
+        n_exc = len(f.excitation_stgs)
+        n_freq = max(len(f.frequency_stgs), 1)
+        L = len(f.ppcData) // (n_exc * n_freq)
+        mat = np.reshape(f.ppcData, (n_exc, n_freq, L))
+        result.append(mat if n_freq > 1 else mat[:, 0, :])
     return np.array(result)
 
 

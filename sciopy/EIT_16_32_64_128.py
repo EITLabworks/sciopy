@@ -5,6 +5,7 @@ import serial
 from .com_util import (
     clTbt_dp,
     clTbt_sp,
+    clTbt_u16,
 )
 
 import numpy as np
@@ -264,31 +265,108 @@ class EIT_16_32_64_128:
         )
         self.print_msg = False
 
-    def update_ExcitationFrequency(self, exc_freq):
+    def update_ExcitationFrequencies(
+        self,
+        f_min: float,
+        f_max: float = None,
+        f_count: int = 1,
+        f_scale: str = "lin",
+    ):
         """
-        update_ExcitationFrequencies _summary_
+        Configures a single excitation frequency or a full frequency sweep.
+
+        Sends the "Excitation Frequencies" option (0x04) of the "Set
+        Measurement Setup" command (0xB0), as specified by the Sciospec
+        System Message Protocol for the EIT-16/32/64/128 device family:
+
+            [CT] 0x0C 0x04 [f_min] [f_max] [f_count] [f_scale] [CT]
+
+            f_min, f_max : IEEE-754 single precision float, big-endian
+                           (4 bytes each). Minimum / maximum excitation
+                           frequency in Hz (100 Hz to 1 MHz).
+            f_count      : unsigned 16-bit integer, big-endian (2 bytes).
+                           Number of frequency points measured between
+                           f_min and f_max (inclusive). f_count=1 selects a
+                           single-frequency measurement at f_min.
+            f_scale      : 1 byte. 0x00 = linear, 0x01 = logarithmic
+                           distribution of the frequency points between
+                           f_min and f_max.
 
         Parameters
         ----------
-        exc_freq int
-            frequency to be set from 100 Hz to 1 MHz
+        f_min : float
+            Start (or only) excitation frequency in Hz.
+        f_max : float, optional
+            Stop excitation frequency in Hz. Defaults to `f_min`, i.e. a
+            single-frequency measurement.
+        f_count : int, optional
+            Number of frequency points in the sweep. Defaults to 1.
+        f_scale : str, optional
+            ``"lin"`` for a linear sweep or ``"log"`` for a logarithmic
+            sweep. Defaults to ``"lin"``. Ignored when `f_count` is 1.
+
+        Side Effects
+        ------------
+        - Updates `self.setup` (exc_freq, exc_freq_max, n_freq, freq_scale)
+          and re-syncs the message parser's frame layout, when a
+          measurement setup is present, so subsequently received frames are
+          parsed with the right number of frequency points.
+        - Sends the configuration command to the connected device.
         """
+        scale_options = {"lin": 0x00, "log": 0x01}
+        if f_scale not in scale_options:
+            raise ValueError(f"Unknown f_scale {f_scale!r}; expected 'lin' or 'log'.")
+        if f_count < 1:
+            raise ValueError("f_count must be >= 1.")
+        if f_max is None:
+            f_max = f_min
+        if f_count > 1 and f_max <= f_min:
+            raise ValueError("f_max must be greater than f_min when f_count > 1.")
+
+        if self.setup is not None:
+            self.setup.exc_freq = f_min
+            self.setup.exc_freq_max = f_max
+            self.setup.n_freq = f_count
+            self.setup.freq_scale = f_scale
+            if self.cMessageParser is not None:
+                # Re-sync the parser's frame layout (iNumFreqSettings etc.)
+                # with the new sweep configuration.
+                self.cMessageParser.set_measurement_setup(self.setup)
+
         # Set frequencies:
-        # [CT] 0C 04 [fmin] [fmax] [fcount] [ftype] [CT]
+        # [CT] 0C 04 [fmin] [fmax] [fcount] [fscale] [CT]
         self.print_msg = True
-        f_min = clTbt_sp(exc_freq)
-        f_max = clTbt_sp(exc_freq)
-        f_count = [0, 1]
-        f_type = [0]  # linear/log
-        # bytearray
         self.write_command_string(
             bytearray(
                 list(
-                    np.concatenate([[176, 12, 4], f_min, f_max, f_count, f_type, [176]])
+                    np.concatenate(
+                        [
+                            [176, 12, 4],
+                            clTbt_sp(f_min),
+                            clTbt_sp(f_max),
+                            clTbt_u16(f_count),
+                            [scale_options[f_scale]],
+                            [176],
+                        ]
+                    )
                 )
             )
         )
         self.print_msg = False
+
+    def update_ExcitationFrequency(self, exc_freq):
+        """
+        Sets a single excitation frequency (no sweep).
+
+        Kept for backward compatibility; equivalent to
+        ``update_ExcitationFrequencies(f_min=exc_freq, f_count=1)``.
+
+        Parameters
+        ----------
+        exc_freq : int or float
+            frequency to be set from 100 Hz to 1 MHz
+        """
+        self.update_ExcitationFrequencies(f_min=exc_freq, f_count=1)
 
     def SetMeasurementSetup(self, setup: EitMeasurementSetup):
         """
@@ -385,19 +463,15 @@ class EIT_16_32_64_128:
                 list(np.concatenate([[176, 5, 3], clTbt_sp(setup.framerate), [176]]))
             )
         )
-        # Set frequencies:
-        # [CT] 0C 04 [fmin] [fmax] [fcount] [ftype] [CT]
-        f_min = clTbt_sp(setup.exc_freq)
-        f_max = clTbt_sp(setup.exc_freq)
-        f_count = [0, 1]
-        f_type = [0]  # linear/log
-        # bytearray
-        self.write_command_string(
-            bytearray(
-                list(
-                    np.concatenate([[176, 12, 4], f_min, f_max, f_count, f_type, [176]])
-                )
-            )
+        # Set excitation frequencies (single frequency, or a full sweep when
+        # setup.n_freq > 1):
+        self.update_ExcitationFrequencies(
+            f_min=setup.exc_freq,
+            f_max=(
+                setup.exc_freq_max if setup.exc_freq_max is not None else setup.exc_freq
+            ),
+            f_count=setup.n_freq,
+            f_scale=setup.freq_scale,
         )
 
         # Set injection config
@@ -503,6 +577,10 @@ class EIT_16_32_64_128:
         bDeleteData: bool = False,
         sSavePath: str = "C/",
         bResultsFolder=False,
+        f_min: float = None,
+        f_max: float = None,
+        f_count: int = None,
+        f_scale: str = "lin",
     ):
         """
         Starts and stops a measurement process using the configured serial protocol (HS or FS).
@@ -524,9 +602,24 @@ class EIT_16_32_64_128:
                 bSaveData=True, measured data is saved and then removed from RAM
             sSavePath (str): Specifies the sPath where the measured data is saved.
             bResultsFolder (bool): Specifies if additionally a folder in sSavePath is created to store the data in
+            f_min (float, optional): When given, (re)configures the device's excitation
+                frequency/sweep via `update_ExcitationFrequencies` before starting the
+                measurement. Omit to measure with whatever sweep is already configured
+                (e.g. via `SetMeasurementSetup`).
+            f_max (float, optional): Stop frequency of the sweep in Hz. Defaults to
+                `f_min` (single-frequency measurement) when `f_min` is given but
+                `f_max` is not.
+            f_count (int, optional): Number of frequency points in the sweep. Defaults
+                to `self.setup.n_freq` (or 1) when `f_min` is given but `f_count` is not.
+            f_scale (str, optional): "lin" or "log" distribution of the sweep's
+                frequency points. Defaults to "lin".
 
         Returns:
             list or matrix: The measurement data in the format specified by `return_as`.
+            When a frequency sweep (`f_count` / `setup.n_freq` > 1) is active and
+            `return_as="pot_mat"`, the returned matrix has shape
+            (n_frames, n_excitations, n_freq, n_el); otherwise it keeps the previous
+            (n_frames, n_excitations, n_el) shape.
         """
 
         if self.cMessageParser is None:
@@ -535,6 +628,16 @@ class EIT_16_32_64_128:
             raise RuntimeError("SetMeasurementSetup must be called before measuring.")
         if return_as not in {"hex", "pot_mat", "eitframe"}:
             raise ValueError("return_as must be 'hex', 'pot_mat' or 'eitframe'.")
+
+        if f_min is not None:
+            # (Re-)configure a single frequency or a full sweep right before
+            # the measurement starts.
+            self.update_ExcitationFrequencies(
+                f_min=f_min,
+                f_max=f_max,
+                f_count=f_count if f_count is not None else (self.setup.n_freq or 1),
+                f_scale=f_scale,
+            )
 
         # Start measurement
         self.cMessageParser.clear_out_data()

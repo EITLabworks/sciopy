@@ -68,6 +68,19 @@ def clTbt_dp(val: float) -> list:
     return [int(ele) for ele in struct.pack(">d", val)]
 
 
+def clTbt_u16(val: int) -> list:
+    """
+    clTbt_u16 converts an unsigned integer to a list of 2 big-endian bytes.
+
+    Used e.g. for the frequency-point count of the "Excitation Frequencies"
+    measurement setup option (0xB0 0x0C 0x04), which the device expects as
+    an unsigned 16-bit big-endian integer.
+    """
+    if not 0 <= val <= 0xFFFF:
+        raise ValueError(f"val must fit in an unsigned 16-bit integer, got {val}.")
+    return [int(bt) for bt in struct.pack(">H", val)]
+
+
 def reshape_full_message_in_bursts(lst: list, ssms: EitMeasurementSetup) -> np.ndarray:
     """
     Takes the full message buffer and splits this message depeding on the measurement configuration into the
