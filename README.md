@@ -4,6 +4,12 @@ This package offers the serial interface for communication with an EIT device fr
 
 ## Installation
 
+You can simply install the package via [`pip`](https://pypi.org/project/sciopy/).
+
+```bash
+pip install sciopy
+```
+
 ### Windows: USB Driver Setup
 
 USB FS:  
@@ -16,13 +22,14 @@ To communicate with the Sciospec instrument over USB (HS) on Windows, you must i
 > Installing the `libusb` driver will prevent the Sciospec instrument from working with the official Sciospec software on the selected USB port (`HS`).
 >
 > After installation, the Sciospec software may no longer recognize the device on that port.  
->  *(This process has been tested, but not successfully. The understanding is based on the Sciospec documentation that installing the libusb driver should enable usage on Windows, but Python still has communication issues. Using USB HS on Windows is therefore not solved.)*
+>  _(This process has been tested, but not successfully. The understanding is based on the Sciospec documentation that installing the libusb driver should enable usage on Windows, but Python still has communication issues. Using USB HS on Windows is therefore not solved.)_
 >
 > To restore the original behavior, you will need to uninstall the driver manually.  
-> *(This rollback process has not been fully tested.)*
-
+> _(This rollback process has not been fully tested.)_
 
 ### Linux/Unix Platforms
+
+_Alternative_
 
 Clone the repository, then create and activate the Conda environment:
 
@@ -42,15 +49,14 @@ pip install -e .
 2. Connect the Sciospec instrument to your computer.
 
 3. Open Zadig and enable:
-	Options → List All Devices 
+   Options → List All Devices
 
 4. Select the correct Sciospec USB device from the list.
 
 5. Install the driver:
-	`libusb-win32 (v1.4.0.0)`
+   `libusb-win32 (v1.4.0.0)`
 
 ---
-
 
 ## Contact
 
@@ -63,5 +69,4 @@ Email: jacob.thoenes@uni-rostock.de
 >
 > Thank you!
 
-___
-
+---
