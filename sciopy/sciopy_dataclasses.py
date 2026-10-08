@@ -1,8 +1,49 @@
 """Dataclasses for sciopy package."""
 
 from dataclasses import dataclass
+from math import isfinite
+from numbers import Integral, Real
+import numpy as np
 from typing import List, Tuple, Union
 import numpy.typing as npt
+
+
+@dataclass
+class EitFrequencyBlock:
+    """One excitation block, with frequencies in Hz and a lin/log distribution."""
+
+    f_min: Union[int, float]
+    f_max: Union[int, float]
+    f_count: int = 1
+    f_type: str = "lin"
+
+    def validate(self):
+        """Validate before sending commands or allocating parser buffers."""
+        for value in (self.f_min, self.f_max):
+            if isinstance(value, bool) or not isinstance(value, Real):
+                raise TypeError("Frequency endpoints must be real numbers.")
+            if not isfinite(value) or value <= 0:
+                raise ValueError("Frequency endpoints must be finite and positive.")
+        if isinstance(self.f_count, bool) or not isinstance(self.f_count, Integral):
+            raise TypeError("f_count must be an integer.")
+        if not 1 <= self.f_count <= 0xFFFF:
+            raise ValueError("f_count must fit in a nonzero unsigned 16-bit integer.")
+        if self.f_max < self.f_min or (self.f_count > 1 and self.f_max == self.f_min):
+            raise ValueError("f_max must be greater than f_min when f_count > 1.")
+        if not isinstance(self.f_type, str) or self.f_type.lower() not in {
+            "lin",
+            "linear",
+            "log",
+            "logarithmic",
+        }:
+            raise ValueError("f_type must be 'lin' or 'log'.")
+
+    @property
+    def scale(self):
+        """Canonical spelling used by the wire protocol."""
+        return {"lin": "lin", "linear": "lin", "log": "log", "logarithmic": "log"}[
+            self.f_type.lower()
+        ]
 
 
 @dataclass
@@ -13,11 +54,13 @@ class EitMeasurementSetup:
     Attributes:
         burst_count (int): Number of bursts per measurement cycle.
         n_el (int): Number of electrodes used in the measurement.
-        exc_freq (int or float): Excitation frequency in Hz. Acts as the start
+        exc_freq (int, float or list of EitFrequencyBlock): Frequency in Hz,
+            or ordered sweep blocks. A scalar acts as the start
             (minimum) frequency of a sweep when ``n_freq`` > 1.
         framerate (int or float): Frame rate of the measurement in Hz.
         amplitude (int or float): Amplitude of the excitation signal.
-        inj_skip (int or list): Electrode(s) to skip during current injection.
+        inj_skip (int or list): One or several distinct injection skip patterns.
+            Each pattern adds n_el excitation settings in configured order.
         gain (int): Amplifier gain setting.
         adc_range (int): Analog-to-digital converter range setting.
         mea_mode (str): Measurement mode, see `update_measurement_mode`.
@@ -36,7 +79,7 @@ class EitMeasurementSetup:
 
     burst_count: int
     n_el: int
-    exc_freq: Union[int, float]
+    exc_freq: Union[int, float, List[EitFrequencyBlock]]
     framerate: Union[int, float]
     amplitude: Union[int, float]
     inj_skip: Union[int, list]
@@ -47,6 +90,55 @@ class EitMeasurementSetup:
     exc_freq_max: Union[int, float, None] = None
     n_freq: int = 1
     freq_scale: str = "lin"
+
+    def get_frequency_blocks(self):
+        """Resolve either the legacy sweep fields or an explicit block list."""
+        if isinstance(self.exc_freq, (list, tuple)):
+            if (
+                self.exc_freq_max is not None
+                or self.n_freq != 1
+                or self.freq_scale != "lin"
+            ):
+                raise ValueError(
+                    "Do not combine frequency blocks with legacy sweep fields."
+                )
+            blocks = list(self.exc_freq)
+        else:
+            blocks = [
+                EitFrequencyBlock(
+                    self.exc_freq,
+                    self.exc_freq if self.exc_freq_max is None else self.exc_freq_max,
+                    self.n_freq,
+                    self.freq_scale,
+                )
+            ]
+        if not blocks:
+            raise ValueError("The frequency block list cannot be empty.")
+        for block in blocks:
+            if not isinstance(block, EitFrequencyBlock):
+                raise TypeError(
+                    "Every frequency block must be an EitFrequencyBlock instance."
+                )
+            block.validate()
+        return blocks
+
+    def get_injection_skips(self):
+        """Return validated skip patterns in their configured order."""
+        skips = (
+            list(self.inj_skip)
+            if isinstance(self.inj_skip, (list, tuple, np.ndarray))
+            else [self.inj_skip]
+        )
+        if not skips:
+            raise ValueError("inj_skip cannot be empty.")
+        for skip in skips:
+            if isinstance(skip, bool) or not isinstance(skip, Integral):
+                raise TypeError("Every inj_skip value must be an integer.")
+            if not 0 <= skip < self.n_el - 1:
+                raise ValueError("inj_skip must satisfy 0 <= inj_skip < n_el - 1.")
+        if len(set(skips)) != len(skips):
+            raise ValueError("inj_skip values must be unique.")
+        return [int(skip) for skip in skips]
 
 
 @dataclass

@@ -70,3 +70,53 @@ Email: jacob.thoenes@uni-rostock.de
 > Thank you!
 
 ---
+
+## EIT frequency blocks and multiple injection patterns
+
+The existing scalar frequency and `exc_freq_max` / `n_freq` / `freq_scale`
+sweep configuration remain supported. To configure several sweeps or discrete
+frequencies in one measurement, pass ordered `EitFrequencyBlock` objects:
+
+```python
+from sciopy import EitFrequencyBlock, EitMeasurementSetup
+
+setup = EitMeasurementSetup(
+    burst_count=2,
+    n_el=16,
+    exc_freq=[
+        EitFrequencyBlock(1_000, 10_000, 10, "lin"),
+        EitFrequencyBlock(10_000, 100_000, 20, "log"),
+    ],
+    framerate=2,
+    amplitude=0.001,
+    inj_skip=[0, 1],
+    gain=1,
+    adc_range=1,
+)
+# With a connected EIT device:
+# device.SetMeasurementSetup(setup)
+# data = device.StartStopMeasurement(return_as="pot_mat")
+```
+
+Do not combine block lists with the legacy sweep fields. Each injection skip
+adds `n_el` excitation settings in the order given. Skip values must be distinct.
+`SetMeasurementSetup` resets the device configuration before appending blocks
+and injection pairs. Direct frequency-update calls append to the device stack;
+use a complete setup to replace an earlier configuration.
+
+For multiple frequencies, `pot_mat` has shape
+`(frames, excitation settings, frequencies, channels)`. The example above
+returns `(2, 32, 30, 16)` for two complete frames. A single frequency keeps the
+existing `(frames, excitation settings, channels)` shape. Frame
+`frequency_stgs` contains the configured frequencies **in Hz**, computed from
+the requested blocks; these are not device readback or independently measured
+frequencies. The wire frequency-row identifier is an index into that list.
+
+Software tests verify command encoding and synthetic frame parsing. Physical
+device validation is still required for each supported model and firmware.
+
+Measurement reads tolerate transient empty USB reads and stop after the requested
+number of complete frames, including saved frames deleted from RAM. The default
+idle timeout is five seconds; slower measurements may require a larger
+`idle_timeout_seconds` when calling `MessageParser.read_usb_till_timeout`.
+Command-response reads retain their immediate empty-read timeout.

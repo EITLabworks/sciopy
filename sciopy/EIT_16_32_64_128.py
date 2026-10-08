@@ -11,7 +11,7 @@ from .com_util import (
 import numpy as np
 from pyftdi.ftdi import Ftdi
 
-from .sciopy_dataclasses import EitMeasurementSetup
+from .sciopy_dataclasses import EitFrequencyBlock, EitMeasurementSetup
 from .usb_message_parser import (
     MessageParser,
     make_eitframes_hex,
@@ -313,60 +313,69 @@ class EIT_16_32_64_128:
           parsed with the right number of frequency points.
         - Sends the configuration command to the connected device.
         """
-        scale_options = {"lin": 0x00, "log": 0x01}
-        if f_scale not in scale_options:
-            raise ValueError(f"Unknown f_scale {f_scale!r}; expected 'lin' or 'log'.")
-        if f_count < 1:
-            raise ValueError("f_count must be >= 1.")
-        if f_max is None:
-            f_max = f_min
-        if f_count > 1 and f_max <= f_min:
-            raise ValueError("f_max must be greater than f_min when f_count > 1.")
-
+        block = EitFrequencyBlock(
+            f_min, f_min if f_max is None else f_max, f_count, f_scale
+        )
+        block.validate()
+        self._write_frequency_blocks([block])
         if self.setup is not None:
             self.setup.exc_freq = f_min
-            self.setup.exc_freq_max = f_max
+            self.setup.exc_freq_max = block.f_max
             self.setup.n_freq = f_count
-            self.setup.freq_scale = f_scale
+            self.setup.freq_scale = block.scale
             if self.cMessageParser is not None:
-                # Re-sync the parser's frame layout (iNumFreqSettings etc.)
-                # with the new sweep configuration.
                 self.cMessageParser.set_measurement_setup(self.setup)
 
-        # Set frequencies:
-        # [CT] 0C 04 [fmin] [fmax] [fcount] [fscale] [CT]
-        self.print_msg = True
-        self.write_command_string(
-            bytearray(
-                list(
-                    np.concatenate(
-                        [
-                            [176, 12, 4],
-                            clTbt_sp(f_min),
-                            clTbt_sp(f_max),
-                            clTbt_u16(f_count),
-                            [scale_options[f_scale]],
-                            [176],
-                        ]
-                    )
+    def _write_frequency_blocks(self, blocks):
+        # Build every command before writing, so invalid input cannot partially
+        # configure the device. Each command appends one frequency-stack block.
+        commands = []
+        for block in blocks:
+            block.validate()
+            commands.append(
+                bytearray(
+                    [0xB0, 0x0C, 0x04]
+                    + clTbt_sp(block.f_min)
+                    + clTbt_sp(block.f_max)
+                    + clTbt_u16(int(block.f_count))
+                    + [0 if block.scale == "lin" else 1, 0xB0]
                 )
             )
-        )
-        self.print_msg = False
+        previous_print_msg = self.print_msg
+        self.print_msg = True
+        try:
+            for command in commands:
+                self.write_command_string(command)
+        finally:
+            self.print_msg = previous_print_msg
 
     def update_ExcitationFrequency(self, exc_freq):
-        """
-        Sets a single excitation frequency (no sweep).
+        """Configure a scalar frequency or append an ordered list of blocks.
 
-        Kept for backward compatibility; equivalent to
-        ``update_ExcitationFrequencies(f_min=exc_freq, f_count=1)``.
-
-        Parameters
-        ----------
-        exc_freq : int or float
-            frequency to be set from 100 Hz to 1 MHz
+        Scalar calls retain the existing single-frequency API. Block lists
+        synchronize the parser with their combined frequency count. Use
+        SetMeasurementSetup to reset the device's frequency stack first.
         """
-        self.update_ExcitationFrequencies(f_min=exc_freq, f_count=1)
+        if not isinstance(exc_freq, (list, tuple)):
+            self.update_ExcitationFrequencies(f_min=exc_freq, f_count=1)
+            return
+        blocks = list(exc_freq)
+        if not blocks:
+            raise ValueError("The frequency block list cannot be empty.")
+        for block in blocks:
+            if not isinstance(block, EitFrequencyBlock):
+                raise TypeError(
+                    "Every frequency block must be an EitFrequencyBlock instance."
+                )
+            block.validate()
+        self._write_frequency_blocks(blocks)
+        if self.setup is not None:
+            self.setup.exc_freq = blocks
+            self.setup.exc_freq_max = None
+            self.setup.n_freq = 1
+            self.setup.freq_scale = "lin"
+            if self.cMessageParser is not None:
+                self.cMessageParser.set_measurement_setup(self.setup)
 
     def SetMeasurementSetup(self, setup: EitMeasurementSetup):
         """
@@ -403,6 +412,8 @@ class EIT_16_32_64_128:
                 "EIT_16_32_64_128 initialization."
             )
 
+        setup.get_frequency_blocks()
+        injection_skips = setup.get_injection_skips()
         self.setup = setup
         self.cMessageParser.set_measurement_setup(self.setup)
         self.print_msg = False
@@ -463,22 +474,24 @@ class EIT_16_32_64_128:
                 list(np.concatenate([[176, 5, 3], clTbt_sp(setup.framerate), [176]]))
             )
         )
-        # Set excitation frequencies (single frequency, or a full sweep when
-        # setup.n_freq > 1):
-        self.update_ExcitationFrequencies(
-            f_min=setup.exc_freq,
-            f_max=(
-                setup.exc_freq_max if setup.exc_freq_max is not None else setup.exc_freq
-            ),
-            f_count=setup.n_freq,
-            f_scale=setup.freq_scale,
-        )
+        if isinstance(setup.exc_freq, (list, tuple)):
+            self.update_ExcitationFrequency(setup.exc_freq)
+        else:
+            self.update_ExcitationFrequencies(
+                f_min=setup.exc_freq,
+                f_max=setup.exc_freq_max,
+                f_count=setup.n_freq,
+                f_scale=setup.freq_scale,
+            )
 
-        # Set injection config
+        # Append a complete set of injection pairs for each skip pattern.
         el_inj = np.arange(1, setup.n_el + 1)
-        el_gnd = np.roll(el_inj, -(setup.inj_skip + 1))
-        for v_el, g_el in zip(el_inj, el_gnd):
-            self.write_command_string(bytearray([0xB0, 0x03, 0x06, v_el, g_el, 0xB0]))
+        for skip in injection_skips:
+            el_gnd = np.roll(el_inj, -(skip + 1))
+            for v_el, g_el in zip(el_inj, el_gnd):
+                self.write_command_string(
+                    bytearray([0xB0, 0x03, 0x06, int(v_el), int(g_el), 0xB0])
+                )
 
         self.print_msg = True
         # Set output configuration - enable all
