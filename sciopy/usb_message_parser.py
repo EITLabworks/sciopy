@@ -147,6 +147,7 @@ class MessageParser:
         # General setup
         self.bPrintMessages = False
         self.iNPZSaveIndex = 1
+        self._completed_frames = 0
         self.iSaveCounter = 0  # Unused
         self.ppcData = []
         self.iInjIndex = 0
@@ -187,8 +188,10 @@ class MessageParser:
         self.setup = setup
         if setup is not None:
             self.iMaxChannelGroups = setup.n_el // 16
-            self.iNumExcitationSettings = setup.n_el  # todo should be independently set
-            self.iNumFreqSettings = getattr(setup, "n_freq", None) or 1
+            self.iNumExcitationSettings = setup.n_el * len(setup.get_injection_skips())
+            self.iNumFreqSettings = sum(
+                block.f_count for block in setup.get_frequency_blocks()
+            )
             self.iLenDataperFrame = (
                 self.iMaxChannelGroups
                 * 16
@@ -245,18 +248,17 @@ class MessageParser:
         if self.setup is None:
             return np.zeros((self.iNumFreqSettings,), dtype=float)
 
-        f_min = self.setup.exc_freq
-        n_freq = getattr(self.setup, "n_freq", None) or 1
-        if n_freq <= 1:
-            return np.array([f_min], dtype=float)
-
-        f_max = getattr(self.setup, "exc_freq_max", None)
-        if f_max is None:
-            f_max = f_min
-        f_scale = getattr(self.setup, "freq_scale", "lin")
-        if f_scale == "log":
-            return np.logspace(np.log10(f_min), np.log10(f_max), n_freq)
-        return np.linspace(f_min, f_max, n_freq)
+        frequencies = []
+        for block in self.setup.get_frequency_blocks():
+            if block.f_count == 1:
+                frequencies.append(np.array([block.f_min], dtype=float))
+            elif block.scale == "log":
+                frequencies.append(
+                    np.geomspace(block.f_min, block.f_max, block.f_count)
+                )
+            else:
+                frequencies.append(np.linspace(block.f_min, block.f_max, block.f_count))
+        return np.concatenate(frequencies)
 
     # ---------------------------------------------------------------------------------------------------------------- #
     def clear_out_data(self):
@@ -389,21 +391,22 @@ class MessageParser:
         bDeleteDataFrame: bool = False,
         sSavePath: str = "C/",
         bStartReset: bool = True,
+        idle_timeout_seconds: float = 5.0,
     ):
+        """Read a measurement through transient empty reads, or until idle.
+
+        Command-response reads (bStartReset=False or no setup) retain their
+        immediate empty-read timeout. Measurement reads stop after the requested
+        number of complete frames, including frames saved and deleted from RAM.
+        An idle timeout can still return fewer frames than requested.
         """
-        Reads out the USB connection until the connections times out, so for messages received + timeout. Data bytes are parsed,
-        sorted into full messages and then handled according to their Command Tag. Status or requested information is
-        displayed if wished and measured EIT data is stored, deleted or returned.
-        Args:
-            bSaveData: if data should be saved
-            bDeleteDataFrame: if data frame is deleted after saving data
-            sSavePath: Path where the data should be saved
-        Returns:
-            List of received data eit frames, no Status messages are saved
-        """
-        if bStartReset and self.setup is not None:
+        if not np.isfinite(idle_timeout_seconds) or idle_timeout_seconds < 0:
+            raise ValueError("idle_timeout_seconds must be finite and nonnegative.")
+        is_measurement_read = bStartReset and self.setup is not None
+        if is_measurement_read:
             self.reset_new_data_frame()
-        timeout_count = 0
+        start_frame_count = self._completed_frames
+        last_data_time = time.monotonic()
         while True:
             buffer = self.device_read()
             if buffer:
@@ -411,13 +414,20 @@ class MessageParser:
                     self.interpret_message(
                         message, bSaveData, bDeleteDataFrame, sSavePath
                     )
-                timeout_count = 0
-                continue
-            timeout_count += 1
-            if timeout_count >= 1:
-                # Break if we haven't received any data
+                last_data_time = time.monotonic()
+                if (
+                    is_measurement_read
+                    and self.setup.burst_count > 0
+                    and self._completed_frames - start_frame_count
+                    >= self.setup.burst_count
+                ):
+                    break
+            elif not is_measurement_read:
                 break
-
+            elif time.monotonic() - last_data_time >= idle_timeout_seconds:
+                break
+            else:
+                time.sleep(0.01)
         return self.ppcData
 
     # ---------------------------------------------------------------------------------------------------------------- #
@@ -497,6 +507,7 @@ class MessageParser:
                 self.iSaveCounter += 1
             if self.iSaveCounter == self.iLenDataperFrame:
                 # Frame Full
+                self._completed_frames += 1
                 self.CurrentFrame.timestamp2 = byteintarray_to_float(message[7:11])
                 if bSave:
                     save_data_frame(sSavePath, self.CurrentFrame, self.iNPZSaveIndex)
